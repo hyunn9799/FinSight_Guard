@@ -1,0 +1,14 @@
+langgraph
+langchain
+langchain-openai
+openai
+yfinance
+pandas
+numpy
+streamlit
+fastapi
+uvicorn
+python-dotenv
+pydantic
+pytest
+requests
