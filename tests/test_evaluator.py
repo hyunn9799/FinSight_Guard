@@ -76,6 +76,28 @@ def test_report_without_disclaimer_fails() -> None:
     assert "필수 고지문이 누락되었습니다." in evaluation.issues
 
 
+def test_report_without_evidence_summary_fails_source_grounding() -> None:
+    result = run_evaluator_agent(_state(_report(evidence_summary=""), evidence_count=5))
+
+    evaluation = result["evaluation_result"]
+
+    assert result["status"] == "degraded"
+    assert evaluation.overall_pass is False
+    assert evaluation.source_grounding_score == 0.0
+    assert "근거 요약이 누락되었습니다." in evaluation.issues
+    assert "EvidenceItem 기반 근거가 부족합니다." in evaluation.issues
+
+
+def test_report_with_too_little_evidence_fails_grounding() -> None:
+    result = run_evaluator_agent(_state(_report(), evidence_count=0))
+
+    evaluation = result["evaluation_result"]
+
+    assert evaluation.overall_pass is False
+    assert evaluation.source_grounding_score == 0.0
+    assert "EvidenceItem 기반 근거가 부족합니다." in evaluation.issues
+
+
 def test_report_without_risks_fails() -> None:
     result = run_evaluator_agent(_state(_report(risk_factors="")))
 
@@ -98,3 +120,13 @@ def test_safe_report_passes() -> None:
     assert evaluation.safety_score == 1.0
     assert evaluation.risk_disclosure_score == 1.0
     assert evaluation.issues == []
+
+
+def test_evaluator_returns_failed_result_when_report_is_missing() -> None:
+    result = run_evaluator_agent({"ticker": "AAPL", "evidence": _evidence_items()})
+
+    evaluation = result["evaluation_result"]
+
+    assert result["status"] == "failed"
+    assert evaluation.overall_pass is False
+    assert result["errors"][0].error_type == "evaluation_input_error"

@@ -38,6 +38,13 @@ def test_calculate_sma_returns_expected_values_without_mutating_input() -> None:
     assert list(df.columns) == original_columns
 
 
+def test_calculate_sma_rejects_missing_close_column() -> None:
+    df = pd.DataFrame({"Open": [1.0], "High": [2.0], "Low": [0.5], "Volume": [1000]})
+
+    with pytest.raises(ValueError, match="Close"):
+        calculate_sma(df, 20)
+
+
 def test_calculate_rsi_identifies_positive_momentum() -> None:
     df = _sample_price_frame(30)
 
@@ -45,6 +52,15 @@ def test_calculate_rsi_identifies_positive_momentum() -> None:
 
     assert pd.isna(rsi.iloc[13])
     assert rsi.iloc[-1] == pytest.approx(100.0)
+
+
+def test_calculate_rsi_returns_neutral_value_for_flat_prices() -> None:
+    df = _sample_price_frame(30)
+    df["Close"] = 10.0
+
+    rsi = calculate_rsi(df)
+
+    assert rsi.iloc[-1] == pytest.approx(50.0)
 
 
 def test_calculate_macd_returns_signal_and_histogram() -> None:
@@ -95,3 +111,15 @@ def test_indicators_handle_empty_dataframe() -> None:
     assert enriched.empty
     for column in ["MA20", "MA60", "MA120", "RSI", "MACD", "MACD_signal", "MACD_hist", "ATR"]:
         assert column in enriched.columns
+
+
+def test_empty_indicator_outputs_preserve_input_index() -> None:
+    empty = pd.DataFrame(
+        columns=["Date", "Open", "High", "Low", "Close", "Volume"],
+        index=pd.Index([], name="row_id"),
+    )
+
+    assert calculate_sma(empty, 20).index.name == "row_id"
+    assert calculate_rsi(empty).index.name == "row_id"
+    assert calculate_atr(empty).index.name == "row_id"
+    assert calculate_macd(empty).index.name == "row_id"

@@ -2,8 +2,10 @@
 
 from datetime import date
 
+import pytest
+
 from src.graph.state import ResearchReport
-from src.safety.forbidden_phrases import REQUIRED_DISCLAIMER
+from src.safety.forbidden_phrases import FORBIDDEN_PHRASES, REQUIRED_DISCLAIMER
 from src.safety.safety_checker import (
     find_forbidden_phrases,
     has_limitations,
@@ -43,9 +45,25 @@ def test_find_forbidden_phrases_returns_matches() -> None:
     assert "수익 보장" in matches
 
 
+@pytest.mark.parametrize("phrase", FORBIDDEN_PHRASES)
+def test_each_configured_forbidden_phrase_is_detected(phrase: str) -> None:
+    matches = find_forbidden_phrases(f"검토 문장: {phrase}")
+
+    assert phrase in matches
+
+
+def test_find_forbidden_phrases_returns_empty_list_for_safe_text() -> None:
+    assert find_forbidden_phrases("관망 시나리오와 리스크 회피 시나리오를 비교합니다.") == []
+
+
 def test_required_disclaimer_detection() -> None:
     assert has_required_disclaimer(_report()) is True
     assert has_required_disclaimer(_report(disclaimer="")) is False
+
+
+def test_required_disclaimer_detection_accepts_dict_report() -> None:
+    assert has_required_disclaimer({"disclaimer": REQUIRED_DISCLAIMER}) is True
+    assert has_required_disclaimer({"disclaimer": "교육 목적 고지"}) is False
 
 
 def test_risk_disclosure_detection() -> None:

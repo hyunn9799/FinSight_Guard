@@ -43,6 +43,7 @@ def test_save_report_json_creates_file_and_loads(monkeypatch, tmp_path) -> None:
     assert Path(path).suffix == ".json"
     assert loaded["run_id"] == "run123"
     assert loaded["final_report"]["ticker"] == "AAPL"
+    assert loaded["final_report"]["data_date"] == "2026-05-12"
 
 
 def test_save_report_markdown_creates_file(monkeypatch, tmp_path) -> None:
@@ -55,7 +56,22 @@ def test_save_report_markdown_creates_file(monkeypatch, tmp_path) -> None:
     assert Path(path).exists()
     assert Path(path).name.startswith("run123_AAPL_")
     assert Path(path).suffix == ".md"
-    assert "AAPL Research Report" in Path(path).read_text(encoding="utf-8")
+    text = Path(path).read_text(encoding="utf-8")
+    assert "AAPL Research Report" in text
+    assert "## 시나리오 분석" in text
+    assert "고지문" in text
+
+
+def test_save_report_json_sanitizes_ticker_in_filename(monkeypatch, tmp_path) -> None:
+    import src.storage.report_store as report_store
+
+    monkeypatch.setattr(report_store, "REPORT_DIR", tmp_path)
+    report = _report().model_copy(update={"ticker": "BRK.B / TEST"})
+
+    path = save_report_json("run123", {"run_id": "run123", "final_report": report})
+
+    assert Path(path).exists()
+    assert "BRK.B_TEST" in Path(path).name
 
 
 def test_metrics_update_works() -> None:

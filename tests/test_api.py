@@ -3,6 +3,8 @@
 from datetime import date
 
 import main
+import pytest
+from pydantic import ValidationError
 from src.graph.state import EvaluationResult, ResearchReport
 from src.observability.metrics import record_run, reset_metrics
 from src.storage.report_store import save_report_json
@@ -44,7 +46,10 @@ def test_health_endpoint() -> None:
 
 
 def test_analyze_endpoint_with_monkeypatched_workflow(monkeypatch) -> None:
+    calls = {"count": 0}
+
     def fake_workflow(ticker: str, investment_horizon: str, risk_profile: str) -> dict:
+        calls["count"] += 1
         assert ticker == "AAPL"
         assert investment_horizon == "장기"
         assert risk_profile == "중립형"
@@ -67,12 +72,27 @@ def test_analyze_endpoint_with_monkeypatched_workflow(monkeypatch) -> None:
         )
     )
 
+    assert calls["count"] == 1
     assert payload["run_id"] == "run123"
     assert payload["status"] == "success"
     assert payload["final_report"]["ticker"] == "AAPL"
     assert payload["evaluation_result"]["overall_pass"] is True
     assert payload["report_path"].endswith(".json")
     assert payload["errors"] == []
+
+
+def test_analyze_endpoint_rejects_invalid_payload_before_workflow(monkeypatch) -> None:
+    def fake_workflow(ticker: str, investment_horizon: str, risk_profile: str) -> dict:
+        raise AssertionError("workflow should not run for invalid request payload")
+
+    monkeypatch.setattr(main, "run_research_workflow", fake_workflow)
+
+    with pytest.raises(ValidationError):
+        main.AnalyzeRequest(
+            ticker="",
+            investment_horizon="초장기",
+            risk_profile="중립형",
+        )
 
 
 def test_metrics_endpoint() -> None:
@@ -102,3 +122,13 @@ def test_get_report_endpoint(monkeypatch, tmp_path) -> None:
     assert payload["run_id"] == "run123"
     assert payload["final_report"]["ticker"] == "AAPL"
     assert path.endswith(".json")
+
+
+def test_get_report_endpoint_returns_404_for_unknown_run(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(main, "REPORT_DIR", tmp_path)
+
+    with pytest.raises(main.HTTPException) as exc_info:
+        main.get_report("missing-run")
+
+    assert exc_info.value.status_code == 404
+    assert exc_info.value.detail == "Report not found."
