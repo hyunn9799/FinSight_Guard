@@ -54,12 +54,15 @@ flowchart TD
 
     M --> F[Fundamental Agent]
     F --> N[News Agent]
-    N --> C[Coordinator Agent]
+    N --> ST[Workflow State]
 
-    M -. EvidenceItem .-> EV[(Evidence List)]
-    F -. EvidenceItem .-> EV
-    N -. EvidenceItem .-> EV
-    EV --> C
+    M -. MarketAnalysis + EvidenceItem .-> ST
+    F -. FundamentalAnalysis + EvidenceItem .-> ST
+    N -. NewsAnalysis + EvidenceItem .-> ST
+
+    ST --> EV[(Evidence List)]
+    ST --> C[Coordinator Agent]
+    EV -. 근거 요약 .-> C
 
     C --> R[한국어 초안 보고서]
     R --> Q[Evaluator Agent]
