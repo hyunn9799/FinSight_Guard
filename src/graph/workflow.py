@@ -13,8 +13,14 @@ from src.agents.fundamental_agent import run_fundamental_agent
 from src.agents.market_agent import run_market_agent
 from src.agents.news_agent import run_news_agent
 from src.agents.rewrite_agent import run_rewrite_agent
-from src.graph.routing import route_after_evaluation, route_after_validation
-from src.graph.state import GraphState, ResearchReport, UserInput, WorkflowError
+from src.agents.supervisor_agent import run_supervisor_agent
+from src.graph.routing import (
+    route_after_evaluation,
+    route_after_supervisor,
+    route_after_validation,
+)
+from src.graph.state import AgentName, GraphState, ResearchReport, UserInput, WorkflowError
+from src.graph_rag.graph_context_builder import build_graph_context
 from src.observability.logger import log_node_error, log_node_start, log_node_success
 from src.observability.metrics import record_run
 from src.storage.report_store import save_report_json, save_report_markdown
@@ -23,11 +29,19 @@ from src.storage.run_store import save_run
 
 VALID_INVESTMENT_HORIZONS = {"단기", "중기", "장기"}
 VALID_RISK_PROFILES = {"보수형", "중립형", "공격형"}
+GRAPH_CONTEXT_FOCUS_BY_QUESTION_TYPE = {
+    "technical_analysis": "technical",
+    "fundamental_analysis": "fundamental",
+    "news_risk_analysis": "news_risk",
+    "comprehensive_report": "comprehensive",
+    "safety_or_unclear": "comprehensive",
+}
 
 
 class ResearchWorkflowState(GraphState, total=False):
     """Workflow-local state keys not stored in the shared contract yet."""
 
+    user_query: str
     investment_horizon: str
     risk_profile: str
     report_path: str
@@ -86,6 +100,58 @@ def _safe_node(node_name: str, fn, state: ResearchWorkflowState) -> dict:
         }
 
 
+def _append_agent(agents: list[AgentName], agent: AgentName) -> list[AgentName]:
+    if agent in agents:
+        return agents
+    return [*agents, agent]
+
+
+def _track_agent_result(
+    state: ResearchWorkflowState,
+    result: dict,
+    *,
+    agent: AgentName,
+    analysis_key: str,
+) -> dict:
+    completed_agents = list(result.get("completed_agents", state.get("completed_agents", [])))
+    failed_agents = list(result.get("failed_agents", state.get("failed_agents", [])))
+
+    if result.get(analysis_key) is not None:
+        completed_agents = _append_agent(completed_agents, agent)
+    elif result.get("status") in {"failed", "degraded"}:
+        failed_agents = _append_agent(failed_agents, agent)
+
+    return {
+        **result,
+        "completed_agents": completed_agents,
+        "failed_agents": failed_agents,
+    }
+
+
+def _collect_available_evidence(state: ResearchWorkflowState) -> list:
+    evidence = list(state.get("evidence", []))
+    for analysis_key in ("market_analysis", "fundamental_analysis", "news_analysis"):
+        analysis = state.get(analysis_key)
+        if analysis is not None:
+            evidence.extend(analysis.evidence)
+
+    seen_ids: set[str] = set()
+    unique_evidence = []
+    for item in evidence:
+        if item.evidence_id in seen_ids:
+            continue
+        seen_ids.add(item.evidence_id)
+        unique_evidence.append(item)
+    return unique_evidence
+
+
+def _graph_context_focus(state: ResearchWorkflowState) -> str:
+    supervisor_plan = state.get("supervisor_plan")
+    if supervisor_plan is None or supervisor_plan.question_type is None:
+        return "unknown"
+    return GRAPH_CONTEXT_FOCUS_BY_QUESTION_TYPE.get(supervisor_plan.question_type, "unknown")
+
+
 def input_validator_node(state: ResearchWorkflowState) -> dict:
     """Validate user inputs and stop early on critical errors."""
     run_id = state.get("run_id", "")
@@ -135,12 +201,16 @@ def input_validator_node(state: ResearchWorkflowState) -> dict:
             "errors": [*state.get("errors", []), *errors],
         }
 
+    user_query = state.get("user_query", "").strip()
+    if not user_query:
+        user_query = f"투자기간: {investment_horizon}; 위험성향: {risk_profile}"
+
     result = {
         "status": "running",
         "ticker": ticker,
         "user_input": UserInput(
             ticker=ticker,
-            user_query=f"투자기간: {investment_horizon}; 위험성향: {risk_profile}",
+            user_query=user_query,
         ),
         "started_at": state.get("started_at") or datetime.now(UTC),
         "warnings": state.get("warnings", []),
@@ -153,17 +223,63 @@ def input_validator_node(state: ResearchWorkflowState) -> dict:
 
 def market_node(state: ResearchWorkflowState) -> dict:
     """Run Market Agent with degraded-mode exception handling."""
-    return _safe_node("market_node", run_market_agent, state)
+    result = _safe_node("market_node", run_market_agent, state)
+    return _track_agent_result(
+        state,
+        result,
+        agent="market",
+        analysis_key="market_analysis",
+    )
 
 
 def fundamental_node(state: ResearchWorkflowState) -> dict:
     """Run Fundamental Agent with degraded-mode exception handling."""
-    return _safe_node("fundamental_node", run_fundamental_agent, state)
+    result = _safe_node("fundamental_node", run_fundamental_agent, state)
+    return _track_agent_result(
+        state,
+        result,
+        agent="fundamental",
+        analysis_key="fundamental_analysis",
+    )
 
 
 def news_node(state: ResearchWorkflowState) -> dict:
     """Run News Agent with degraded-mode exception handling."""
-    return _safe_node("news_node", run_news_agent, state)
+    result = _safe_node("news_node", run_news_agent, state)
+    return _track_agent_result(
+        state,
+        result,
+        agent="news",
+        analysis_key="news_analysis",
+    )
+
+
+def supervisor_node(state: ResearchWorkflowState) -> dict:
+    """Run deterministic Supervisor Agent with degraded-mode exception handling."""
+    return _safe_node("supervisor_node", run_supervisor_agent, state)
+
+
+def run_graph_context_builder_node(state: ResearchWorkflowState) -> dict:
+    """Build GraphContext from available EvidenceItem objects only."""
+    ticker = state.get("ticker", "").strip().upper()
+    if not ticker:
+        user_input = state.get("user_input")
+        ticker = user_input.ticker.strip().upper() if user_input is not None else ""
+    evidence = _collect_available_evidence(state)
+    graph_context = build_graph_context(
+        ticker=ticker,
+        evidence_items=evidence,
+        focus=_graph_context_focus(state),
+    )
+    return {
+        "graph_context": graph_context,
+        "evidence": evidence,
+    }
+
+
+def graph_context_node(state: ResearchWorkflowState) -> dict:
+    """Build lightweight graph context before report coordination."""
+    return _safe_node("graph_context_node", run_graph_context_builder_node, state)
 
 
 def coordinator_node(state: ResearchWorkflowState) -> dict:
@@ -250,9 +366,11 @@ def build_research_graph():
     """Build and compile the LangGraph research workflow."""
     graph = StateGraph(ResearchWorkflowState)
     graph.add_node("input_validator_node", input_validator_node)
+    graph.add_node("supervisor_node", supervisor_node)
     graph.add_node("market_node", market_node)
     graph.add_node("fundamental_node", fundamental_node)
     graph.add_node("news_node", news_node)
+    graph.add_node("graph_context_node", graph_context_node)
     graph.add_node("coordinator_node", coordinator_node)
     graph.add_node("evaluator_node", evaluator_node)
     graph.add_node("rewrite_node", rewrite_node)
@@ -263,13 +381,25 @@ def build_research_graph():
         "input_validator_node",
         route_after_validation,
         {
-            "continue": "market_node",
+            "continue": "supervisor_node",
             "stop": END,
         },
     )
-    graph.add_edge("market_node", "fundamental_node")
-    graph.add_edge("fundamental_node", "news_node")
-    graph.add_edge("news_node", "coordinator_node")
+    graph.add_conditional_edges(
+        "supervisor_node",
+        route_after_supervisor,
+        {
+            "market_node": "market_node",
+            "fundamental_node": "fundamental_node",
+            "news_node": "news_node",
+            "graph_context_node": "graph_context_node",
+            "coordinator_node": "coordinator_node",
+        },
+    )
+    graph.add_edge("market_node", "supervisor_node")
+    graph.add_edge("fundamental_node", "supervisor_node")
+    graph.add_edge("news_node", "supervisor_node")
+    graph.add_edge("graph_context_node", "coordinator_node")
     graph.add_edge("coordinator_node", "evaluator_node")
     graph.add_conditional_edges(
         "evaluator_node",
@@ -288,6 +418,7 @@ def run_research_workflow(
     ticker: str,
     investment_horizon: str,
     risk_profile: str,
+    user_query: str | None = None,
 ) -> dict:
     """Run the full research workflow and return API-friendly state fields."""
     run_id = uuid4().hex
@@ -302,6 +433,8 @@ def run_research_workflow(
         "rewrite_attempts": 0,
         "started_at": datetime.now(UTC),
     }
+    if user_query is not None:
+        initial_state["user_query"] = user_query
     final_state = build_research_graph().invoke(initial_state)
     if "run_id" not in final_state:
         final_state["run_id"] = run_id
@@ -323,8 +456,13 @@ def run_research_workflow(
         "market_analysis": final_state.get("market_analysis"),
         "fundamental_analysis": final_state.get("fundamental_analysis"),
         "news_analysis": final_state.get("news_analysis"),
+        "supervisor_plan": final_state.get("supervisor_plan"),
+        "graph_context": final_state.get("graph_context"),
         "final_report": final_state.get("final_report"),
         "evaluation_result": final_state.get("evaluation_result"),
+        "status": final_state.get("status"),
+        "rewrite_attempts": final_state.get("rewrite_attempts", 0),
         "errors": final_state.get("errors", []),
+        "warnings": final_state.get("warnings", []),
         "report_path": final_state.get("report_path"),
     }

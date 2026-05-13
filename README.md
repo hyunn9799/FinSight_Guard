@@ -1,124 +1,146 @@
 # FinSight Guard
 
-LangGraph 기반의 증거 중심 금융 리서치 멀티 에이전트 워크플로우입니다. 시장 데이터, 재무 데이터, 뉴스 근거를 수집하고 Evaluator Agent가 안전성과 근거성을 검수한 뒤 한국어 리서치 보고서를 생성합니다.
+FinSight Guard는 LangGraph 기반의 증거 중심 금융 리서치 멀티 에이전트 워크플로우입니다. 시장 데이터, 재무 데이터, 뉴스 근거를 수집하고, Supervisor가 질문 유형에 맞게 필요한 분석 Agent를 라우팅한 뒤, Coordinator와 Evaluator/Rewrite 루프를 통해 한국어 리서치 보고서를 생성합니다.
 
-![alt text](image.png)
+이 프로젝트는 주식 추천 시스템이 아닙니다. 자동매매, 증권사 주문 실행, 매수/매도/보유 권유, 수익 보장 기능을 포함하지 않습니다.
 
+![alt text](image-1.png)
 
-## 주식 추천 시스템이 아닌 이유
+## 프로젝트 목적
 
-FinSight Guard는 투자 자문 서비스, 자동매매 시스템, 주식 추천 엔진이 아닙니다. 이 프로젝트는 주문을 실행하지 않고, 증권사 API와 연결하지 않으며, 수익을 보장하거나 특정 종목의 매수, 매도, 보유를 지시하지 않습니다.
+금융 리서치는 가격 데이터, 재무 지표, 뉴스 이벤트, 리스크 해석, 안전 문구가 함께 필요한 영역입니다. 단순 챗봇 방식은 근거 없는 수치나 직접적인 투자 권유 문장을 만들기 쉽습니다.
 
-목표는 사용자가 시장, 펀더멘털, 뉴스 근거를 바탕으로 여러 시나리오를 비교할 수 있도록 돕는 것입니다. 모든 최종 보고서는 리스크, 한계, 근거 요약, 필수 고지문을 포함해야 합니다.
+FinSight Guard는 다음 패턴을 포트폴리오 수준으로 보여주는 것을 목표로 합니다.
 
-필수 고지문:
+- LangGraph 기반 조건부 멀티 에이전트 워크플로우
+- 질문 유형에 따른 Supervisor 기반 동적 라우팅
+- Market/Fundamental/News Agent의 역할 분리
+- `EvidenceItem` 기반 근거 추적
+- Lightweight Graph RAG 방식의 `GraphContext`
+- 한국어 시나리오 기반 보고서 생성
+- Evaluator Agent의 책임 있는 AI 검수
+- Rewrite Agent를 통한 안전 문구와 근거 보강
+- 로컬 JSON/Markdown 보고서 저장, 로그, metrics, FastAPI, Streamlit, Docker, pytest
+
+## 안전 원칙
+
+FinSight Guard는 투자 자문 서비스가 아니라 교육 및 정보 제공 목적의 리서치 보조 도구입니다.
+
+금지하는 동작:
+
+- 실제 매매
+- 증권사/Broker API 연동
+- 주문 실행
+- 포트폴리오 자동 운용
+- 특정 종목 매수/매도/보유 권유
+- 수익, 원금, 목표가 보장
+- 근거 없는 재무 사실 또는 뉴스 생성
+
+모든 최종 보고서는 다음 고지문을 포함해야 합니다.
 
 ```text
 본 보고서는 교육 및 정보 제공 목적의 AI 리서치 결과이며, 특정 종목의 매수·매도·보유를 권유하지 않습니다. 최종 투자 판단과 책임은 투자자 본인에게 있습니다.
 ```
 
-## 문제 정의
+## 현재 워크플로우
 
-금융 리서치는 실시간성 데이터, 정량 지표, 뉴스 해석, 민감한 투자 표현이 함께 섞이는 영역입니다. 단순 챗봇 방식은 근거가 부족한 주장이나 직접적인 투자 권유 문장을 생성하기 쉽습니다.
-
-이 프로젝트는 다음과 같은 더 안전한 멀티 에이전트 패턴을 보여주는 것을 목표로 합니다.
-
-- 데이터 수집과 분석 책임을 에이전트별로 분리
-- 중요한 수치와 사실 주장에 구조화된 EvidenceItem 연결
-- 관망, 분할 접근, 리스크 회피 중심의 한국어 시나리오 보고서 생성
-- Evaluator Agent가 근거성, 안전성, 리스크, 최신성, 고지문을 검수
-- 실패한 보고서는 Rewrite Agent로 보내 수정 후 재평가
-
-## 주요 기능
-
-- 명시적인 노드 라우팅을 가진 LangGraph 워크플로우
-- `yfinance` 가격 데이터를 사용하는 Market Agent
-- 기술적 지표 계산: MA20, MA60, MA120, RSI, MACD, ATR
-- `yfinance` 재무 지표를 사용하는 Fundamental Agent
-- 뉴스 검색 provider 경로와 deterministic mock fallback
-- 출처 기반 사실 추적을 위한 `EvidenceItem` 스키마
-- 한국어 시나리오 기반 보고서 생성
-- Responsible AI 검수를 위한 Evaluator Agent
-- 안전하지 않거나 불완전한 보고서를 수정하는 Rewrite Agent
-- 입력 검증 실패, 평가 통과/실패, rewrite 제한에 대한 조건부 분기
-- JSON 및 Markdown 보고서 저장
-- 구조화 로그와 기본 런타임 metrics
-- Streamlit UI와 FastAPI API
-- Docker 및 Docker Compose 지원
-- 외부 API에 의존하지 않는 deterministic pytest 테스트
-
-## 아키텍처 다이어그램
-
-```mermaid
-flowchart TD
-    U[사용자 입력] --> V[Input Validator]
-    V -->|유효| M[Market Agent]
-    V -->|실패| E1[Validation Error 반환]
-
-    M --> F[Fundamental Agent]
-    F --> N[News Agent]
-    N --> ST[Workflow State]
-
-    M -. MarketAnalysis + EvidenceItem .-> ST
-    F -. FundamentalAnalysis + EvidenceItem .-> ST
-    N -. NewsAnalysis + EvidenceItem .-> ST
-
-    ST --> EV[(Evidence List)]
-    ST --> C[Coordinator Agent]
-    EV -. 근거 요약 .-> C
-
-    C --> R[한국어 초안 보고서]
-    R --> Q[Evaluator Agent]
-
-    Q -->|PASS| S[JSON 및 Markdown 저장]
-    Q -->|FAIL and attempts < 2| W[Rewrite Agent]
-    W --> Q
-    Q -->|FAIL after max attempts| SF[실패 보고서 저장]
-
-    S --> API[FastAPI / Streamlit 응답]
-    SF --> API
-```
-
-## LangGraph 워크플로우
-
-주요 워크플로우는 `src/graph/workflow.py`에 구현되어 있습니다.
+초기 버전은 Market -> Fundamental -> News 순차 실행이었지만, 현재 구조는 Supervisor 기반 동적 라우팅입니다.
 
 ```text
 START
   -> input_validator_node
-  -> market_node
-  -> fundamental_node
-  -> news_node
+  -> supervisor_node
+     -> market_node / fundamental_node / news_node
+     -> supervisor_node 반복
+  -> graph_context_node
   -> coordinator_node
   -> evaluator_node
      -> PASS: save_report_node -> END
-     -> FAIL: rewrite_node -> evaluator_node
+     -> FAIL and rewrite_attempts < 2: rewrite_node -> evaluator_node
      -> FAIL after max attempts: save_report_node -> END
 ```
 
+```mermaid
+flowchart TD
+    U[사용자 입력] --> V[Input Validator]
+    V -->|실패| END1[Validation Error]
+    V -->|성공| S[Supervisor Agent]
 
-주요 라우팅 동작:
+    S -->|market_node| M[Market Agent]
+    S -->|fundamental_node| F[Fundamental Agent]
+    S -->|news_node| N[News Agent]
 
-- ticker 입력이 유효하지 않으면 validation error와 함께 조기 종료
-- market data 실패는 node-level error handling을 통해 degraded mode로 처리
-- 뉴스 provider key가 없거나 provider 호출이 실패하면 mock news fallback 사용
-- Evaluator가 실패를 반환하면 Rewrite Agent로 라우팅
-- rewrite는 설정된 최대 횟수 이후 중단
+    M --> S
+    F --> S
+    N --> S
+
+    S -->|planned agents done| G[Graph Context Builder Lite]
+    G --> C[Coordinator Agent]
+    C --> R[Draft ResearchReport]
+    R --> E[Evaluator Agent]
+
+    E -->|PASS| SAVE[Save JSON/Markdown]
+    E -->|FAIL and attempts < 2| W[Rewrite Agent]
+    W --> E
+    E -->|FAIL after max attempts| SAVE_FAIL[Save Failed Report]
+
+    SAVE --> OUT[API / Streamlit Response]
+    SAVE_FAIL --> OUT
+```
+
+## Supervisor 라우팅
+
+Supervisor는 사용자 질문을 다음 질문 유형 중 하나로 분류합니다.
+
+| question_type | 기본 실행 계획 | 목적 |
+| --- | --- | --- |
+| `technical_analysis` | `market -> news` | 차트, 단기, RSI, MACD, 추세 등 |
+| `fundamental_analysis` | `fundamental -> news` | 저평가, 재무, PER, PBR, ROE, 장기 관점 등 |
+| `news_risk_analysis` | `news -> market -> fundamental` | 최근 뉴스, 악재, 규제, 소송, 리스크 등 |
+| `comprehensive_report` | `market -> fundamental -> news` | 종합 보고서, 전체 리서치 |
+| `safety_or_unclear` | `market -> fundamental -> news` | 직접 조언 요청 또는 불명확한 질문 |
+
+기본 Supervisor는 deterministic keyword rule로 동작합니다. 테스트가 안정적으로 재현되도록 기본값은 LLM을 사용하지 않습니다.
+
+### Optional LLM Supervisor
+
+LLM Supervisor는 선택 기능입니다. 활성화되어도 LLM은 분석 라우팅만 결정합니다. 투자 조언, 매수/매도/보유 추천, 재무 사실, 뉴스, evidence를 생성하지 않습니다.
+
+활성화 조건:
+
+```bash
+ENABLE_LLM_SUPERVISOR=true
+OPENAI_API_KEY=...
+LLM_SUPERVISOR_MODEL=gpt-4o-mini
+```
+
+비활성화 또는 실패 시:
+
+- `ENABLE_LLM_SUPERVISOR=false`이면 rule-based Supervisor 사용
+- `OPENAI_API_KEY`가 없으면 rule-based Supervisor 사용
+- LLM 응답이 invalid JSON이면 fallback
+- 알 수 없는 agent나 question type이면 fallback
+- 직접 조언형 질문은 LLM을 호출하지 않고 `safety_or_unclear`로 처리
+
+허용되는 agent는 `market`, `fundamental`, `news`뿐입니다.
 
 ## Agent 책임
 
 | Agent | 책임 | 출력 |
 | --- | --- | --- |
-| Market Agent | 가격 이력 수집, 기술 지표 계산, 추세/모멘텀/변동성 요약 | `MarketAnalysis`, market `EvidenceItem` |
-| Fundamental Agent | 기업 정보와 재무 지표 수집, 누락 필드 처리 | `FundamentalAnalysis`, fundamental `EvidenceItem` |
-| News Agent | 설정된 경우 최근 뉴스 검색, 아니면 deterministic mock news 사용 | `NewsAnalysis`, news `EvidenceItem` |
-| Coordinator Agent | 에이전트 결과를 결합해 한국어 시나리오 기반 보고서 생성 | `ResearchReport` |
-| Evaluator Agent | 근거성, 수치 일관성, 안전 표현, 리스크, 한계, 최신성, 고지문 검수 | `EvaluationResult` |
-| Rewrite Agent | 안전하지 않은 문구 제거, 누락된 리스크/한계/근거/고지문 보강 | 수정된 `ResearchReport` |
+| Input Validator | ticker, 투자 기간, 위험 성향 검증 | `UserInput`, normalized ticker |
+| Supervisor Agent | 질문 유형 분류, 실행할 Agent 순서 결정 | `SupervisorPlan` |
+| Market Agent | yfinance 가격 이력 수집, MA/RSI/MACD/ATR 계산 | `MarketAnalysis`, market `EvidenceItem` |
+| Fundamental Agent | yfinance 기업/재무 지표 수집, 누락 필드 처리 | `FundamentalAnalysis`, fundamental `EvidenceItem` |
+| News Agent | Tavily/Firecrawl 또는 mock provider로 뉴스/이벤트 리스크 수집 | `NewsAnalysis`, news `EvidenceItem` |
+| Graph Context Builder Lite | EvidenceItem에서 관계 그래프 컨텍스트 생성 | `GraphContext` |
+| Coordinator Agent | 분석 결과와 GraphContext를 결합해 한국어 보고서 생성 | `ResearchReport` |
+| Evaluator Agent | 안전성, 근거성, 리스크, 한계, 고지문 검수 | `EvaluationResult` |
+| Rewrite Agent | 실패한 보고서의 안전 문구, 근거, 한계, GraphContext 반영 보강 | 수정된 `ResearchReport` |
 
-## Evidence-Grounded 설계
+## Evidence와 GraphContext
 
-중요한 수치나 사실 주장은 `EvidenceItem` 객체로 표현합니다.
+중요한 수치나 사실 주장은 `EvidenceItem`으로 추적합니다.
 
 ```text
 evidence_id
@@ -132,38 +154,61 @@ metric_value
 description
 ```
 
-Coordinator Agent는 최종 보고서에 근거 요약 섹션을 포함합니다. Evaluator Agent는 evidence가 존재하는지, 보고서에 비어 있지 않은 evidence summary가 포함되어 있는지도 확인합니다.
+최종 보고서는 evidence summary에 실제 존재하는 evidence ID만 포함해야 합니다. Supervisor가 일부 Agent를 건너뛴 경우에도 누락된 분석은 실패로 조작하지 않고 scope limitation으로 명시합니다.
 
-이 설계는 MVP 포트폴리오 프로젝트에 맞춘 경량 구현입니다. 기관 수준의 감사 가능성을 주장하기보다는, evidence-grounded workflow의 구조와 계약을 보여주는 데 초점을 둡니다.
+GraphContext는 외부 graph DB나 vector DB를 쓰지 않는 lightweight JSON/Pydantic 구조입니다.
 
-## Evaluator Agent 설계
+```text
+GraphContext
+  - ticker
+  - focus
+  - nodes
+  - edges
+  - key_relations_summary
+  - risk_relations
+  - positive_relations
+  - evidence_ids
+```
+
+GraphContext는 다음 목적으로 사용됩니다.
+
+- EvidenceItem에서 추출한 risk/event/metric/source 관계 요약
+- 리스크 관계를 보고서의 `"관계 기반 리스크 및 근거 요약"` 섹션에 반영
+- Evaluator가 graph risk relation이 보고서에 반영됐는지 확인
+
+## Evaluator와 Rewrite Loop
 
 Evaluator Agent는 다음 항목을 검수합니다.
 
-- source grounding
-- numeric consistency
 - 금지된 투자 권유 문구
 - 필수 고지문
 - 리스크 공시
 - 분석 한계
-- 데이터 최신성
+- evidence summary 존재 여부
+- 보고서 본문에 존재하지 않는 evidence ID가 참조되는지 여부
+- Supervisor 계획상 실행되어야 했던 Agent 결과가 누락됐는지 여부
+- skipped agent가 failure가 아니라 scope limitation으로 처리됐는지 여부
+- GraphContext risk relation이 보고서에 반영됐는지 여부
+- data date와 freshness
 
-Evaluator는 다음 결과를 반환합니다.
+검수 결과는 `EvaluationResult`로 반환됩니다.
 
-- `overall_pass`
-- `0.0`부터 `1.0`까지의 개별 점수
-- issue 목록
-- revision suggestion 목록
+```text
+overall_pass
+source_grounding_score
+numeric_consistency_score
+safety_score
+risk_disclosure_score
+freshness_score
+issues
+revision_suggestions
+```
 
-보고서가 실패하면 LangGraph는 상태를 Rewrite Agent로 라우팅합니다.
-
-## 조건부 분기와 Rewrite Loop
-
-워크플로우는 입력 검증 결과와 Evaluator 결과에 따라 조건부 edge를 사용합니다.
+Evaluator가 실패하면 Rewrite Agent가 보고서를 수정하고 Evaluator가 다시 검수합니다. 무한 루프를 막기 위해 rewrite는 최대 2회로 제한됩니다.
 
 ```mermaid
 flowchart LR
-    A[Evaluator Result] --> B{overall_pass?}
+    A[Evaluator] --> B{overall_pass?}
     B -->|yes| C[Save Report]
     B -->|no| D{rewrite_attempts < 2?}
     D -->|yes| E[Rewrite Agent]
@@ -171,40 +216,16 @@ flowchart LR
     D -->|no| F[Save Failed Report]
 ```
 
-Rewrite loop는 의도적으로 제한되어 있습니다. 무한 재시도를 막고 실패 동작을 명확하게 만들기 위한 설계입니다.
-
-## 안전성과 Responsible AI
-
-안전성 레이어는 규칙 기반이며 보수적으로 동작합니다. 직접적인 투자 권유 표현과 수익 보장성 문구를 탐지하거나 Rewrite Agent를 통해 완화합니다.
-
-금지 문구 예시:
-
-- 무조건 매수
-- 강력 매수
-- 반드시 매수
-- 지금 사야 합니다
-- 매도해야 합니다
-- 수익 보장
-- 손실 없음
-- 확실한 수익
-- 원금 보장
-- 목표가 보장
-
-최종 보고서는 다음 시나리오 기반 표현을 사용해야 합니다.
-
-- 관망 시나리오
-- 분할 접근 시나리오
-- 리스크 회피 시나리오
-
-이 시스템은 교육 및 정보 제공 목적의 리서치 보조 도구로 설계되었습니다.
+Rewrite Agent는 없는 evidence, metric, URL, 뉴스 사실을 만들지 않습니다. 근거가 부족한 경우에는 limitation을 추가합니다.
 
 ## 기술 스택
 
-- Python 3.11
+- Python 3.11+
 - LangGraph
 - Pydantic
-- pandas, numpy
 - yfinance
+- pandas, numpy
+- OpenAI SDK
 - FastAPI
 - Streamlit
 - Docker, Docker Compose
@@ -222,8 +243,14 @@ cp .env.example .env
 선택 환경 변수:
 
 ```bash
-TAVILY_API_KEY=...
-FIRECRAWL_API_KEY=...
+OPENAI_API_KEY=
+TAVILY_API_KEY=
+FIRECRAWL_API_KEY=
+LLM_MODEL=gpt-4o-mini
+ENABLE_LLM_SUPERVISOR=false
+LLM_SUPERVISOR_MODEL=gpt-4o-mini
+REPORT_DIR=reports
+LOG_DIR=logs
 ```
 
 뉴스 provider key가 없으면 workflow는 deterministic mock news fallback을 사용합니다.
@@ -234,11 +261,13 @@ FIRECRAWL_API_KEY=...
 streamlit run app.py
 ```
 
-기본 로컬 URL:
+기본 URL:
 
 ```text
 http://localhost:8501
 ```
+
+현재 Streamlit UI는 ticker, 투자 기간, 위험 성향 입력을 중심으로 동작합니다. 별도 자유 질문 입력은 `run_research_workflow(..., user_query=...)`에서 지원되며, UI 연결은 후속 개선 대상입니다.
 
 ## FastAPI 실행
 
@@ -246,7 +275,7 @@ http://localhost:8501
 uvicorn main:app --reload
 ```
 
-기본 로컬 URL:
+기본 URL:
 
 ```text
 http://localhost:8000
@@ -267,6 +296,24 @@ GET  /reports/{run_id}
 curl -X POST http://localhost:8000/analyze \
   -H "Content-Type: application/json" \
   -d '{"ticker":"AAPL","investment_horizon":"중기","risk_profile":"중립형"}'
+```
+
+현재 FastAPI 요청 모델도 ticker, 투자 기간, 위험 성향 중심입니다. 자유 질문 기반 dynamic routing을 API 입력으로 노출하는 작업은 다음 단계에서 연결할 수 있습니다.
+
+## Python API 예시
+
+```python
+from src.graph.workflow import run_research_workflow
+
+result = run_research_workflow(
+    ticker="AAPL",
+    investment_horizon="장기",
+    risk_profile="중립형",
+    user_query="최근 악재 때문에 위험해?",
+)
+
+print(result["supervisor_plan"].question_type)
+print(result["final_report"].title)
 ```
 
 ## Docker 실행
@@ -293,11 +340,33 @@ python -m compileall src
 pytest
 ```
 
-테스트는 deterministic하게 동작하도록 설계했습니다. 시장 데이터, 재무 데이터, 뉴스 provider 호출은 필요한 경우 mock 또는 fixture로 대체합니다.
+현재 Codex 실행 환경처럼 `python` 또는 `pytest`가 PATH에 없고 가상환경에만 있을 경우:
+
+```bash
+.venv/bin/python -m compileall src
+.venv/bin/pytest
+```
+
+테스트는 deterministic하게 동작하도록 설계했습니다. 외부 API 호출은 mock 또는 fallback으로 대체하며, live yfinance/Tavily/Firecrawl/OpenAI 호출에 의존하지 않습니다.
+
+현재 주요 테스트 범위:
+
+- technical indicator
+- evidence schema
+- safety checker
+- supervisor routing
+- graph context builder
+- coordinator
+- evaluator
+- rewrite
+- workflow routing
+- workflow E2E
+- FastAPI health/analyze
+- report storage
 
 ## 예시 출력
 
-생성 보고서의 축약 예시:
+축약된 보고서 예시:
 
 ```text
 Title: AAPL 증거 기반 AI 리서치 보고서
@@ -306,15 +375,18 @@ Data date: 2026-05-12
 요약:
 AAPL에 대해 시장, 펀더멘털, 뉴스 근거를 종합해 관망, 분할 접근, 리스크 회피 관점의 시나리오를 검토할 수 있습니다.
 
+관계 기반 리스크 및 근거 요약:
+- risk:규제 -> company:AAPL: negative_risk, evidence_id=news_001
+
 시나리오 분석:
 1. 관망 시나리오: 현재 확인된 시장, 재무, 뉴스 근거를 바탕으로 추가 데이터와 이벤트를 계속 점검하는 시나리오입니다.
 2. 분할 접근 시나리오: 단일 판단에 의존하지 않고 여러 데이터 시점의 근거를 나누어 검토할 수 있습니다.
 3. 리스크 회피 시나리오: 근거 부족, 변동성 확대, 부정적 이벤트가 확인될 경우 보수적으로 검토할 수 있습니다.
 
 근거 요약:
-1. [market] MA20 값=180.5 - 20일 이동평균
-2. [fundamental] trailingPE 값=28.1 - 후행 PER
-3. [news] news_item - 제품 이벤트 리스크 기사
+1. evidence_id=market_001; source_type=market; metric_name=RSI; metric_value=58.2; description=RSI는 중립 구간입니다.
+2. evidence_id=fundamental_001; source_type=fundamental; metric_name=PER; metric_value=28.1; description=PER 기준 밸류에이션 비교가 필요합니다.
+3. evidence_id=news_001; source_type=news; metric_name=news_item; metric_value=None; description=최근 악재와 규제 리스크가 언급되었습니다.
 
 고지문:
 본 보고서는 교육 및 정보 제공 목적의 AI 리서치 결과이며, 특정 종목의 매수·매도·보유를 권유하지 않습니다. 최종 투자 판단과 책임은 투자자 본인에게 있습니다.
@@ -325,7 +397,7 @@ Evaluator 결과 예시:
 ```json
 {
   "overall_pass": true,
-  "source_grounding_score": 0.8,
+  "source_grounding_score": 1.0,
   "numeric_consistency_score": 1.0,
   "safety_score": 1.0,
   "risk_disclosure_score": 1.0,
@@ -335,23 +407,41 @@ Evaluator 결과 예시:
 }
 ```
 
+## 저장과 관측성
+
+- 보고서 JSON/Markdown은 `reports/`에 저장됩니다.
+- workflow run 기록은 run store에 저장됩니다.
+- 구조화 로그는 `logs/`에 기록됩니다.
+- `/metrics`는 in-memory runtime metrics를 반환합니다.
+
+metrics 예시:
+
+```text
+total_runs
+successful_runs
+failed_runs
+average_evaluation_score
+```
+
 ## 한계
 
-- 이 프로젝트는 MVP 포트폴리오 프로젝트이며 production 금융 리서치 플랫폼이 아닙니다.
+- 이 프로젝트는 MVP/포트폴리오 목적의 연구 보조 시스템이며 production 금융 플랫폼이 아닙니다.
 - `yfinance` 데이터는 지연, 누락, 비가용, rate limit 영향을 받을 수 있습니다.
-- 뉴스 검색은 provider key가 없거나 provider 호출이 실패하면 mock data로 대체됩니다.
-- Evaluator는 주로 규칙 기반이며, workflow safety를 보여주는 용도이지 완전한 컴플라이언스 검토 도구가 아닙니다.
-- numeric consistency 검사는 아직 단순하며, 모든 보고서 문장과 모든 evidence 값을 완전하게 교차검증하지 않습니다.
-- 보고서는 production database가 아니라 로컬 파일 시스템에 저장됩니다.
-- runtime metrics는 in-memory 방식이며 프로세스가 재시작되면 초기화됩니다.
-- 이 시스템은 실제 매매, 증권사 연동, 포트폴리오 최적화, 개인화 투자 자문을 구현하지 않습니다.
+- 뉴스 provider key가 없거나 provider 호출이 실패하면 mock data로 대체됩니다.
+- GraphContext는 JSON/Pydantic 기반 경량 구조이며 Neo4j, vector DB, Redis 같은 외부 인프라를 사용하지 않습니다.
+- Evaluator는 규칙 기반 검수 중심이며 완전한 컴플라이언스 시스템이 아닙니다.
+- numeric consistency 검사는 아직 모든 문장과 모든 evidence 값을 완전하게 교차 검증하지 않습니다.
+- Streamlit/FastAPI의 자유 질문 입력 연결은 후속 개선 대상입니다.
+- runtime metrics는 in-memory 방식이라 프로세스 재시작 시 초기화됩니다.
+- 보고서는 로컬 파일 시스템에 저장되며 production database를 사용하지 않습니다.
 
 ## 향후 개선
 
-- 실제 Tavily/Firecrawl 연동 고도화
-- 금융 보고서 RAG
-- vector DB
-- 고도화된 LLM evaluator
-- backtesting module
-- cloud deployment
-- monitoring dashboard
+- FastAPI/Streamlit에 `user_query` 입력 노출
+- `.env.example`에 LLM Supervisor 설정 명시
+- Report markdown export에 `graph_context_section` 포함
+- numeric consistency 교차검증 고도화
+- GraphContext entity/relation extraction 정교화
+- Tavily/Firecrawl provider 통합 테스트 확대
+- Docker 기반 end-to-end smoke test
+- 로그/metrics dashboard 개선

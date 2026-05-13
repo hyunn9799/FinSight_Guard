@@ -6,6 +6,24 @@ from typing import Literal, TypedDict
 from pydantic import BaseModel, Field
 
 from src.evidence.evidence_schema import EvidenceItem
+from src.graph_rag.graph_schema import GraphContext
+
+
+AgentName = Literal["market", "fundamental", "news"]
+QuestionType = Literal[
+    "technical_analysis",
+    "fundamental_analysis",
+    "news_risk_analysis",
+    "comprehensive_report",
+    "safety_or_unclear",
+]
+ExecutionMode = Literal["full", "selective", "degraded"]
+NextNode = Literal[
+    "market_node",
+    "fundamental_node",
+    "news_node",
+    "coordinator_node",
+]
 
 
 class UserInput(BaseModel):
@@ -61,6 +79,7 @@ class ResearchReport(BaseModel):
     market_section: str
     fundamental_section: str
     news_section: str
+    graph_context_section: str = ""
     scenario_analysis: str
     risk_factors: str
     limitations: str
@@ -79,6 +98,29 @@ class EvaluationResult(BaseModel):
     freshness_score: float = Field(ge=0.0, le=1.0)
     issues: list[str] = Field(default_factory=list)
     revision_suggestions: list[str] = Field(default_factory=list)
+
+
+class SupervisorPlan(BaseModel):
+    """Rule-based execution plan for supervisor-controlled routing."""
+
+    required_agents: list[AgentName] = Field(
+        default_factory=lambda: ["market", "fundamental", "news"]
+    )
+    completed_agents: list[AgentName] = Field(default_factory=list)
+    failed_agents: list[AgentName] = Field(default_factory=list)
+    skipped_agents: list[AgentName] = Field(default_factory=list)
+    next_node: NextNode
+    rationale: str = ""
+    allow_degraded_report: bool = True
+    question_type: QuestionType | None = None
+    execution_mode: ExecutionMode | None = None
+    risk_focus: bool = False
+    needs_graph_context: bool = False
+    routing_reason: str = ""
+    planned_agent_order: list[AgentName] = Field(default_factory=list)
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+    used_llm: bool = False
+    fallback_used: bool = False
 
 
 class WorkflowError(BaseModel):
@@ -105,6 +147,13 @@ class GraphState(TypedDict, total=False):
     draft_report: ResearchReport
     final_report: ResearchReport
     evaluation_result: EvaluationResult
+    supervisor_plan: SupervisorPlan
+    graph_context: GraphContext | None
+    completed_agents: list[AgentName]
+    failed_agents: list[AgentName]
+    skipped_agents: list[AgentName]
+    agent_execution_order: list[AgentName]
+    next_agent: AgentName | None
     errors: list[WorkflowError]
     warnings: list[str]
     retry_counts: dict[str, int]

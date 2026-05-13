@@ -7,6 +7,13 @@ from src.graph.state import GraphState
 
 ValidationRoute = Literal["continue", "stop"]
 EvaluationRoute = Literal["save_report_node", "rewrite_node"]
+SupervisorRoute = Literal[
+    "market_node",
+    "fundamental_node",
+    "news_node",
+    "graph_context_node",
+    "coordinator_node",
+]
 
 MAX_REWRITE_ATTEMPTS = 2
 
@@ -16,6 +23,16 @@ def route_after_validation(state: GraphState) -> ValidationRoute:
     if state.get("status") == "failed":
         return "stop"
     return "continue"
+
+
+def route_after_supervisor(state: GraphState) -> SupervisorRoute:
+    """Route to the next node selected by the deterministic supervisor."""
+    supervisor_plan = state.get("supervisor_plan")
+    if supervisor_plan is None:
+        return "graph_context_node"
+    if supervisor_plan.next_node == "coordinator_node":
+        return "graph_context_node"
+    return supervisor_plan.next_node
 
 
 def route_after_evaluation(state: GraphState) -> EvaluationRoute:

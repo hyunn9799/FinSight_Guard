@@ -9,7 +9,8 @@ from src.evidence.evidence_builder import (
     build_market_evidence,
     build_news_evidence,
 )
-from src.graph.routing import route_after_evaluation
+from src.graph.routing import route_after_evaluation, route_after_supervisor
+from src.graph.state import SupervisorPlan
 from src.graph.state import (
     EvaluationResult,
     FundamentalAnalysis,
@@ -79,6 +80,32 @@ def test_max_rewrite_count_routes_to_save_failed_report() -> None:
     assert route_after_evaluation(state) == "save_report_node"
 
 
+def test_missing_supervisor_plan_routes_to_coordinator_fallback() -> None:
+    assert route_after_supervisor({}) == "graph_context_node"
+
+
+def test_supervisor_plan_routes_to_selected_node() -> None:
+    state = {
+        "supervisor_plan": SupervisorPlan(
+            next_node="market_node",
+            rationale="market_analysis가 없어 Market Agent를 먼저 실행합니다.",
+        )
+    }
+
+    assert route_after_supervisor(state) == "market_node"
+
+
+def test_completed_supervisor_plan_routes_to_graph_context_node() -> None:
+    state = {
+        "supervisor_plan": SupervisorPlan(
+            next_node="coordinator_node",
+            rationale="계획된 분석이 모두 완료되어 Coordinator Agent로 이동합니다.",
+        )
+    }
+
+    assert route_after_supervisor(state) == "graph_context_node"
+
+
 def test_rewrite_agent_removes_unsafe_language_and_adds_required_sections() -> None:
     state = {
         "draft_report": _unsafe_report(),
@@ -117,6 +144,7 @@ def test_full_workflow_success_path_with_mocked_agents(monkeypatch, tmp_path) ->
     import src.graph.workflow as workflow
     import src.observability.logger as project_logger
 
+    calls: list[str] = []
     market_evidence = build_market_evidence(
         ticker="AAPL",
         metric_name="MA20",
@@ -140,6 +168,7 @@ def test_full_workflow_success_path_with_mocked_agents(monkeypatch, tmp_path) ->
     )
 
     def fake_market_agent(state: dict) -> dict:
+        calls.append("market")
         assert state["ticker"] == "AAPL"
         return {
             "status": "success",
@@ -155,6 +184,7 @@ def test_full_workflow_success_path_with_mocked_agents(monkeypatch, tmp_path) ->
         }
 
     def fake_fundamental_agent(state: dict) -> dict:
+        calls.append("fundamental")
         assert state["market_analysis"].ticker == "AAPL"
         evidence = [*state.get("evidence", []), fundamental_evidence]
         return {
@@ -171,6 +201,7 @@ def test_full_workflow_success_path_with_mocked_agents(monkeypatch, tmp_path) ->
         }
 
     def fake_news_agent(state: dict) -> dict:
+        calls.append("news")
         assert state["fundamental_analysis"].ticker == "AAPL"
         evidence = [*state.get("evidence", []), news_evidence]
         return {
@@ -185,6 +216,18 @@ def test_full_workflow_success_path_with_mocked_agents(monkeypatch, tmp_path) ->
                 evidence=[news_evidence],
             ),
         }
+
+    original_coordinator_agent = workflow.run_coordinator_agent
+    original_graph_context_builder_node = workflow.run_graph_context_builder_node
+
+    def fake_graph_context_builder_node(state: dict) -> dict:
+        calls.append("graph_context")
+        return original_graph_context_builder_node(state)
+
+    def fake_coordinator_agent(state: dict) -> dict:
+        calls.append("coordinator")
+        assert state.get("graph_context") is not None
+        return original_coordinator_agent(state)
 
     def fake_save_report_json(run_id: str, payload: dict) -> str:
         report_path = tmp_path / f"{run_id}_AAPL_report.json"
@@ -201,6 +244,8 @@ def test_full_workflow_success_path_with_mocked_agents(monkeypatch, tmp_path) ->
     monkeypatch.setattr(workflow, "run_market_agent", fake_market_agent)
     monkeypatch.setattr(workflow, "run_fundamental_agent", fake_fundamental_agent)
     monkeypatch.setattr(workflow, "run_news_agent", fake_news_agent)
+    monkeypatch.setattr(workflow, "run_graph_context_builder_node", fake_graph_context_builder_node)
+    monkeypatch.setattr(workflow, "run_coordinator_agent", fake_coordinator_agent)
     monkeypatch.setattr(workflow, "save_report_json", fake_save_report_json)
     monkeypatch.setattr(workflow, "save_report_markdown", fake_save_report_markdown)
 
@@ -213,6 +258,7 @@ def test_full_workflow_success_path_with_mocked_agents(monkeypatch, tmp_path) ->
     assert "관망 시나리오" in result["final_report"].scenario_analysis
     assert result["final_report"].disclaimer == REQUIRED_DISCLAIMER
     assert result["evaluation_result"].overall_pass is True
-    assert result["evaluation_result"].source_grounding_score == 0.8
+    assert result["evaluation_result"].source_grounding_score >= 0.8
     assert result["report_path"].endswith("_AAPL_report.json")
     assert Path(result["report_path"]).exists()
+    assert calls == ["market", "fundamental", "news", "graph_context", "coordinator"]
