@@ -2,6 +2,9 @@
 
 LangGraph 기반의 증거 중심 금융 리서치 멀티 에이전트 워크플로우입니다. 시장 데이터, 재무 데이터, 뉴스 근거를 수집하고 Evaluator Agent가 안전성과 근거성을 검수한 뒤 한국어 리서치 보고서를 생성합니다.
 
+![alt text](image.png)
+
+
 ## 주식 추천 시스템이 아닌 이유
 
 FinSight Guard는 투자 자문 서비스, 자동매매 시스템, 주식 추천 엔진이 아닙니다. 이 프로젝트는 주문을 실행하지 않고, 증권사 API와 연결하지 않으며, 수익을 보장하거나 특정 종목의 매수, 매도, 보유를 지시하지 않습니다.
@@ -92,7 +95,6 @@ START
      -> FAIL: rewrite_node -> evaluator_node
      -> FAIL after max attempts: save_report_node -> END
 ```
-![alt text](image.png)
 
 
 주요 라우팅 동작:
