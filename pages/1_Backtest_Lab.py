@@ -121,7 +121,9 @@ def main() -> None:
             "과거 시뮬레이션 수익률을 최대화하는 파라미터 조합을 탐색합니다. "
             "과적합 가능성이 있으므로 결과는 참고용입니다."
         )
-        n_trials = st.number_input("최적화 시도 횟수", min_value=10, value=50, step=10)
+        n_trials = st.number_input(
+            "최적화 시도 횟수", min_value=10, max_value=500, value=50, step=10
+        )
         if st.button(f"최적화 시작 ({n_trials}회)"):
             progress = st.progress(0)
             status = st.empty()

@@ -59,7 +59,9 @@ def _compute_rsi(series: pd.Series, period: int) -> pd.Series:
     loss = np.where(delta < 0, -delta, 0)
     avg_gain = pd.Series(gain, index=series.index).rolling(period).mean()
     avg_loss = pd.Series(loss, index=series.index).rolling(period).mean()
-    rs = avg_gain / avg_loss
+    # Avoid a 0/0 -> NaN RuntimeWarning on flat segments; treat zero average
+    # loss as missing so RSI stays NaN there instead of polluting logs.
+    rs = avg_gain.div(avg_loss.replace(0, np.nan))
     return 100 - (100 / (1 + rs))
 
 
@@ -150,12 +152,25 @@ def run_backtest(
             signal[i] = 0
 
     for _, date_p2, div_type in divergences:
-        if date_p2 in df_temp.index:
-            idx = df_temp.index.get_loc(date_p2)
-            if div_type == "bullish":
-                signal[idx] = 1
-            elif div_type == "bearish":
-                signal[idx] = -1
+        if date_p2 not in df_temp.index:
+            continue
+        # get_loc returns an int only for a unique index; a duplicated timestamp
+        # yields a slice or boolean array, which would silently overwrite many
+        # rows if used as an index. Collapse to the first matching position.
+        loc = df_temp.index.get_loc(date_p2)
+        if isinstance(loc, slice):
+            idx = loc.start
+        elif isinstance(loc, np.ndarray):
+            nonzero = np.flatnonzero(loc)
+            if nonzero.size == 0:
+                continue
+            idx = int(nonzero[0])
+        else:
+            idx = int(loc)
+        if div_type == "bullish":
+            signal[idx] = 1
+        elif div_type == "bearish":
+            signal[idx] = -1
 
     filtered_signal = np.zeros(len(signal))
     last_signal = 0
@@ -181,7 +196,7 @@ def run_backtest(
         if signals[i] == 1 and position == 0:
             position = balance * (1 - fee) / price
             buy_price = price
-            balance = 0
+            balance = 0.0
             trades.append({"date": trade_date, "type": "Buy", "price": round(price, 3),
                            "quantity": round(position, 6), "balance": round(balance, 3), "profit": 0.0})
         elif signals[i] == -1 and position > 0:

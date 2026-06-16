@@ -1,6 +1,6 @@
 """State contracts shared by LangGraph workflow nodes."""
 
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from typing import Literal, TypedDict
 
 from pydantic import BaseModel, Field
@@ -144,7 +144,7 @@ class WorkflowError(BaseModel):
     message: str
     error_type: str = "workflow_error"
     recoverable: bool = True
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class GraphState(TypedDict, total=False):

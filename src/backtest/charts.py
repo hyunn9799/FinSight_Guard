@@ -16,6 +16,8 @@ import matplotlib.font_manager as fm  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
+from matplotlib.axes import Axes  # noqa: E402
+from matplotlib.figure import Figure  # noqa: E402
 
 # Candidate Korean font families in preference order (macOS, Linux, Windows).
 _KOREAN_FONT_CANDIDATES = (
@@ -74,7 +76,9 @@ def configure_korean_font() -> str | None:
     return None
 
 
-def _plot_divergences(ax, enriched: pd.DataFrame, divergences, column: str) -> None:
+def _plot_divergences(
+    ax: Axes, enriched: pd.DataFrame, divergences: list[tuple], column: str
+) -> None:
     bullish_labeled, bearish_labeled = False, False
     for start_div, end_div, div_type in divergences:
         if start_div not in enriched.index or end_div not in enriched.index:
@@ -93,12 +97,12 @@ def _plot_divergences(ax, enriched: pd.DataFrame, divergences, column: str) -> N
 
 def build_backtest_figure(
     enriched: pd.DataFrame,
-    divergences,
+    divergences: list[tuple],
     *,
     ticker: str,
     rsi_oversold: float,
     rsi_overbought: float,
-):
+) -> Figure:
     """Build a 2-panel (price + RSI) backtest figure. Returns a matplotlib Figure.
 
     ``enriched`` is the ``BacktestResult.enriched`` frame and must contain

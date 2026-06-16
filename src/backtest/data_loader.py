@@ -9,12 +9,16 @@ simulation.
 
 from __future__ import annotations
 
+import re
 from datetime import date
 
 import pandas as pd
 import yfinance as yf
 
 OHLC_COLUMNS = ["Open", "High", "Low", "Close", "Volume"]
+# Defense-in-depth ticker guard (the API layer validates too): alphanumeric plus
+# dot/dash, bounded length, so an unvalidated string never reaches yf.download.
+_TICKER_RE = re.compile(r"^[A-Z0-9.\-]{1,20}$")
 
 
 def _flatten_columns(df: pd.DataFrame) -> pd.DataFrame:
@@ -39,6 +43,8 @@ def load_price_history(
     clean_ticker = ticker.strip().upper()
     if not clean_ticker:
         raise ValueError("Ticker must not be empty.")
+    if not _TICKER_RE.match(clean_ticker):
+        raise ValueError(f"Invalid ticker format: {clean_ticker!r}")
 
     raw = yf.download(clean_ticker, start=start, end=end, auto_adjust=True, progress=False)
     if raw is None or raw.empty:

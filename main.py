@@ -1,11 +1,12 @@
 """FastAPI entrypoint for the financial research workflow."""
 
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException
 from fastapi.encoders import jsonable_encoder
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from src.config import REPORT_DIR
 from src.graph.workflow import run_research_workflow
@@ -16,11 +17,19 @@ from src.storage.run_store import get_run
 
 app = FastAPI(title="Financial Research Multi-Agent API")
 
+# A ticker is alphanumeric plus dot/dash (e.g. ``AAPL``, ``225010.KQ``, ``BRK-B``).
+# Bounding length and character set keeps unvalidated strings from reaching the
+# outbound yfinance request.
+TICKER_PATTERN = r"^[A-Za-z0-9.\-]{1,20}$"
+# Cap how far back a single backtest may look so one request cannot trigger a
+# decade-long download + O(n·window) kernel-regression loop on the server.
+MAX_BACKTEST_LOOKBACK_DAYS = 1825  # ~5 years
+
 
 class AnalyzeRequest(BaseModel):
     """Request body for workflow analysis."""
 
-    ticker: str = Field(min_length=1)
+    ticker: str = Field(min_length=1, max_length=20, pattern=TICKER_PATTERN)
     investment_horizon: Literal["단기", "중기", "장기"]
     risk_profile: Literal["보수형", "중립형", "공격형"]
 
@@ -36,15 +45,63 @@ class AnalyzeResponse(BaseModel):
     errors: list[Any] = Field(default_factory=list)
 
 
+class BacktestParamsInput(BaseModel):
+    """Bounded strategy hyper-parameters accepted from the public API.
+
+    Mirrors ``src.backtest.strategy.BacktestParams`` but every field carries an
+    explicit range so a caller cannot push degenerate values (huge windows,
+    negative periods) into the kernel-regression simulation.
+    """
+
+    model_config = {"extra": "forbid"}
+
+    rsi_period: int = Field(default=14, ge=5, le=30)
+    kr_window: int = Field(default=30, ge=10, le=100)
+    kr_bandwidth: float = Field(default=5.0, ge=0.1, le=20.0)
+    bb_k: float = Field(default=2.0, ge=0.1, le=5.0)
+    extrema_order: int = Field(default=5, ge=1, le=20)
+    rsi_oversold: float = Field(default=30.0, ge=10.0, le=45.0)
+    rsi_overbought: float = Field(default=70.0, ge=55.0, le=90.0)
+
+    @model_validator(mode="after")
+    def validate_rsi_bounds(self) -> "BacktestParamsInput":
+        if self.rsi_oversold >= self.rsi_overbought:
+            raise ValueError("rsi_oversold must be below rsi_overbought")
+        return self
+
+
 class BacktestRequest(BaseModel):
     """Request body for a research run that includes the backtest reference node."""
 
-    ticker: str = Field(min_length=1)
+    ticker: str = Field(min_length=1, max_length=20, pattern=TICKER_PATTERN)
     investment_horizon: Literal["단기", "중기", "장기"]
     risk_profile: Literal["보수형", "중립형", "공격형"]
     start: str | None = None
     end: str | None = None
-    params: dict[str, Any] | None = None
+    params: BacktestParamsInput | None = None
+
+    @model_validator(mode="after")
+    def validate_date_range(self) -> "BacktestRequest":
+        """Reject malformed, future, inverted, or excessively wide date ranges."""
+        try:
+            end_date = date.fromisoformat(self.end) if self.end else date.today()
+            start_date = (
+                date.fromisoformat(self.start)
+                if self.start
+                else end_date - timedelta(days=MAX_BACKTEST_LOOKBACK_DAYS)
+            )
+        except ValueError as exc:
+            raise ValueError("start/end must be ISO dates (YYYY-MM-DD)") from exc
+
+        if end_date > date.today():
+            raise ValueError("end date cannot be in the future")
+        if start_date >= end_date:
+            raise ValueError("start date must be before end date")
+        if (end_date - start_date).days > MAX_BACKTEST_LOOKBACK_DAYS:
+            raise ValueError(
+                f"date range cannot exceed {MAX_BACKTEST_LOOKBACK_DAYS} days"
+            )
+        return self
 
 
 class BacktestResponse(AnalyzeResponse):
@@ -135,6 +192,14 @@ def backtest(request: BacktestRequest) -> dict[str, Any]:
     The backtest output is framed as a past simulation and is never a buy/sell/
     hold recommendation; it flows through the same Coordinator and Evaluator
     safety checks as every other evidence source.
+
+    Latency note: this is a synchronous endpoint (FastAPI runs it in the thread
+    pool). The handler performs a blocking yfinance download plus an O(n*window)
+    kernel-regression simulation, so expect multi-second latency. The cost is
+    bounded by the request model: the date range is capped at
+    MAX_BACKTEST_LOOKBACK_DAYS and strategy params are range-limited, so a single
+    request cannot monopolise a worker indefinitely. Heavy concurrent use should
+    be moved to a background task/queue.
     """
     result = run_research_workflow(
         ticker=request.ticker,
@@ -143,7 +208,7 @@ def backtest(request: BacktestRequest) -> dict[str, Any]:
         enable_backtest=True,
         backtest_start=request.start,
         backtest_end=request.end,
-        backtest_params=request.params,
+        backtest_params=request.params.model_dump() if request.params else None,
     )
     response = {
         "run_id": result.get("run_id"),
