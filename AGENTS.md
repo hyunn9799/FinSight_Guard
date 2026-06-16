@@ -179,3 +179,8 @@ After editing:
 1. Run `python -m compileall src`.
 2. Run relevant tests.
 3. Summarize changed files and remaining TODOs.
+
+<!-- SPECKIT START -->
+For additional context about technologies to be used, project structure,
+shell commands, and other important information, read the current plan
+<!-- SPECKIT END -->
