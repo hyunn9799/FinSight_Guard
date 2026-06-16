@@ -69,6 +69,7 @@ def _render_report(report: Any, report_path: str | None) -> None:
         ("시장 분석", "market_section"),
         ("재무 분석", "fundamental_section"),
         ("뉴스 분석", "news_section"),
+        ("전략 백테스트 참고", "backtest_section"),
         ("시나리오 분석", "scenario_analysis"),
         ("리스크", "risk_factors"),
         ("한계", "limitations"),
@@ -196,6 +197,11 @@ def main() -> None:
         ticker = st.text_input("Ticker", value="AAPL", placeholder="예: AAPL, MSFT, NVDA")
         investment_horizon = st.selectbox("투자 기간", ["단기", "중기", "장기"], index=1)
         risk_profile = st.selectbox("위험 성향", ["보수형", "중립형", "공격형"], index=1)
+        enable_backtest = st.checkbox(
+            "전략 백테스트 포함 (과거 시뮬레이션)",
+            value=False,
+            help="고정된 기술적 규칙을 과거 가격에 적용한 시뮬레이션 참고 정보를 추가합니다. 투자 권유가 아닙니다.",
+        )
         run_button = st.button("워크플로우 실행", type="primary", use_container_width=True)
 
     _render_intro()
@@ -207,6 +213,7 @@ def main() -> None:
                     ticker=ticker,
                     investment_horizon=investment_horizon,
                     risk_profile=risk_profile,
+                    enable_backtest=enable_backtest,
                 )
         except Exception as exc:
             st.session_state["workflow_result"] = None
@@ -233,6 +240,7 @@ def main() -> None:
             "시장 분석",
             "재무 분석",
             "뉴스 분석",
+            "전략 백테스트",
             "종합 보고서",
             "Evaluator 검수",
             "실행 로그/메타정보",
@@ -270,10 +278,30 @@ def main() -> None:
             ],
         )
     with tabs[3]:
-        _render_report(result.get("final_report"), result.get("report_path"))
+        backtest_analysis = result.get("backtest_analysis")
+        if backtest_analysis is None:
+            st.info(
+                "백테스트가 실행되지 않았습니다. 사이드바에서 '전략 백테스트 포함'을 선택한 뒤 다시 실행하세요."
+            )
+        else:
+            st.caption(
+                "아래 결과는 고정된 기술적 규칙의 과거 시뮬레이션 참고 정보이며, "
+                "투자 권유나 미래 수익 보장이 아닙니다."
+            )
+            _render_analysis(
+                backtest_analysis,
+                [
+                    ("백테스트 요약", "summary"),
+                    ("시뮬레이션 구간", "period_summary"),
+                    ("성과 (과거 시뮬레이션)", "performance_summary"),
+                    ("신호 요약", "signal_summary"),
+                ],
+            )
     with tabs[4]:
-        _render_evaluator(result.get("evaluation_result"))
+        _render_report(result.get("final_report"), result.get("report_path"))
     with tabs[5]:
+        _render_evaluator(result.get("evaluation_result"))
+    with tabs[6]:
         _render_meta(result)
 
 

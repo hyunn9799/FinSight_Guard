@@ -81,6 +81,36 @@ def test_analyze_endpoint_with_monkeypatched_workflow(monkeypatch) -> None:
     assert payload["errors"] == []
 
 
+def test_backtest_endpoint_passes_enable_flag_and_returns_analysis(monkeypatch) -> None:
+    captured = {}
+
+    def fake_workflow(**kwargs) -> dict:
+        captured.update(kwargs)
+        return {
+            "run_id": "bt123",
+            "status": "success",
+            "final_report": _report(),
+            "evaluation_result": _evaluation(),
+            "backtest_analysis": {"ticker": "AAPL", "summary": "과거 시뮬레이션 참고"},
+            "report_path": "reports/bt123_AAPL.json",
+            "errors": [],
+        }
+
+    monkeypatch.setattr(main, "run_research_workflow", fake_workflow)
+
+    payload = main.backtest(
+        main.BacktestRequest(
+            ticker="AAPL",
+            investment_horizon="장기",
+            risk_profile="중립형",
+        )
+    )
+
+    assert captured["enable_backtest"] is True
+    assert payload["run_id"] == "bt123"
+    assert payload["backtest_analysis"]["ticker"] == "AAPL"
+
+
 def test_analyze_endpoint_rejects_invalid_payload_before_workflow(monkeypatch) -> None:
     def fake_workflow(ticker: str, investment_horizon: str, risk_profile: str) -> dict:
         raise AssertionError("workflow should not run for invalid request payload")

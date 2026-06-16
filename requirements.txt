@@ -12,3 +12,7 @@ python-dotenv
 pydantic
 pytest
 requests
+scipy
+statsmodels
+matplotlib
+optuna

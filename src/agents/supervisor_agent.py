@@ -327,6 +327,7 @@ def build_supervisor_plan(state: GraphState) -> SupervisorPlan:
         execution_mode=config["execution_mode"],  # type: ignore[arg-type]
         risk_focus=bool(config["risk_focus"]),
         needs_graph_context=bool(config["needs_graph_context"]),
+        needs_backtest=bool(state.get("enable_backtest")),
         routing_reason=str(config["routing_reason"]),
         planned_agent_order=planned_agent_order,
         confidence=1.0,
@@ -437,6 +438,7 @@ def parse_llm_supervisor_response(text: str, state: GraphState | None = None) ->
         execution_mode=parsed.execution_mode,  # type: ignore[arg-type]
         risk_focus=parsed.risk_focus,
         needs_graph_context=parsed.needs_graph_context,
+        needs_backtest=bool(working_state.get("enable_backtest")),
         routing_reason=parsed.routing_reason,
         planned_agent_order=planned_agent_order,
         confidence=_clamp_confidence(parsed.confidence),

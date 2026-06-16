@@ -36,6 +36,23 @@ class AnalyzeResponse(BaseModel):
     errors: list[Any] = Field(default_factory=list)
 
 
+class BacktestRequest(BaseModel):
+    """Request body for a research run that includes the backtest reference node."""
+
+    ticker: str = Field(min_length=1)
+    investment_horizon: Literal["단기", "중기", "장기"]
+    risk_profile: Literal["보수형", "중립형", "공격형"]
+    start: str | None = None
+    end: str | None = None
+    params: dict[str, Any] | None = None
+
+
+class BacktestResponse(AnalyzeResponse):
+    """API response that also surfaces the backtest analysis."""
+
+    backtest_analysis: Any = None
+
+
 class HealthResponse(BaseModel):
     """Health response."""
 
@@ -105,6 +122,35 @@ def analyze(request: AnalyzeRequest) -> dict[str, Any]:
         "status": _infer_status(result),
         "final_report": result.get("final_report"),
         "evaluation_result": result.get("evaluation_result"),
+        "report_path": result.get("report_path"),
+        "errors": result.get("errors", []),
+    }
+    return jsonable_encoder(response)
+
+
+@app.post("/backtest", response_model=BacktestResponse)
+def backtest(request: BacktestRequest) -> dict[str, Any]:
+    """Run the research workflow with the historical-backtest reference node.
+
+    The backtest output is framed as a past simulation and is never a buy/sell/
+    hold recommendation; it flows through the same Coordinator and Evaluator
+    safety checks as every other evidence source.
+    """
+    result = run_research_workflow(
+        ticker=request.ticker,
+        investment_horizon=request.investment_horizon,
+        risk_profile=request.risk_profile,
+        enable_backtest=True,
+        backtest_start=request.start,
+        backtest_end=request.end,
+        backtest_params=request.params,
+    )
+    response = {
+        "run_id": result.get("run_id"),
+        "status": _infer_status(result),
+        "final_report": result.get("final_report"),
+        "evaluation_result": result.get("evaluation_result"),
+        "backtest_analysis": result.get("backtest_analysis"),
         "report_path": result.get("report_path"),
         "errors": result.get("errors", []),
     }

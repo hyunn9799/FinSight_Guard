@@ -11,6 +11,7 @@ SupervisorRoute = Literal[
     "market_node",
     "fundamental_node",
     "news_node",
+    "backtest_node",
     "graph_context_node",
     "coordinator_node",
 ]
@@ -31,6 +32,8 @@ def route_after_supervisor(state: GraphState) -> SupervisorRoute:
     if supervisor_plan is None:
         return "graph_context_node"
     if supervisor_plan.next_node == "coordinator_node":
+        if supervisor_plan.needs_backtest and state.get("backtest_analysis") is None:
+            return "backtest_node"
         return "graph_context_node"
     return supervisor_plan.next_node
 

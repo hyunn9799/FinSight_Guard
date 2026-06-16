@@ -231,6 +231,25 @@ def _news_section(state: GraphState) -> str:
     )
 
 
+def _backtest_section(state: GraphState) -> str:
+    backtest = state.get("backtest_analysis")
+    if backtest is None:
+        return ""
+    evidence_ref = _evidence_ref(backtest.evidence)
+    title = "전략 백테스트 참고 (과거 시뮬레이션)"
+    body = _join_nonempty(
+        [
+            backtest.summary + evidence_ref if backtest.summary else "",
+            backtest.period_summary,
+            backtest.performance_summary + evidence_ref if backtest.performance_summary else "",
+            backtest.signal_summary,
+            _format_notes(backtest.missing_data_notes),
+        ],
+        "백테스트 결과가 비어 있어 과거 시뮬레이션 참고 정보를 제공하지 못했습니다.",
+    )
+    return f"{title}\n{body}"
+
+
 def _question_type(state: GraphState) -> str:
     plan = _supervisor_plan(state)
     if plan is None or plan.question_type is None:
@@ -437,6 +456,7 @@ def run_coordinator_agent(state: GraphState) -> dict:
         fundamental_section=_fundamental_section(state),
         news_section=_news_section(state),
         graph_context_section=graph_context_section,
+        backtest_section=_backtest_section(state),
         scenario_analysis=_scenario_analysis(ticker, state),
         risk_factors=_risk_factors(state),
         limitations=_limitations(state),

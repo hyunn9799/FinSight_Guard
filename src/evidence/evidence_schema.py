@@ -6,7 +6,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
-EvidenceSourceType = Literal["market", "fundamental", "news", "system"]
+EvidenceSourceType = Literal["market", "fundamental", "news", "system", "backtest"]
 EvidenceMetricValue = str | float | int | None
 
 

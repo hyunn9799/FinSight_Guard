@@ -7,6 +7,7 @@ from uuid import uuid4
 
 from langgraph.graph import END, START, StateGraph
 
+from src.agents.backtest_agent import run_backtest_agent
 from src.agents.coordinator_agent import run_coordinator_agent
 from src.agents.evaluator_agent import run_evaluator_agent
 from src.agents.fundamental_agent import run_fundamental_agent
@@ -130,7 +131,12 @@ def _track_agent_result(
 
 def _collect_available_evidence(state: ResearchWorkflowState) -> list:
     evidence = list(state.get("evidence", []))
-    for analysis_key in ("market_analysis", "fundamental_analysis", "news_analysis"):
+    for analysis_key in (
+        "market_analysis",
+        "fundamental_analysis",
+        "news_analysis",
+        "backtest_analysis",
+    ):
         analysis = state.get(analysis_key)
         if analysis is not None:
             evidence.extend(analysis.evidence)
@@ -259,6 +265,16 @@ def supervisor_node(state: ResearchWorkflowState) -> dict:
     return _safe_node("supervisor_node", run_supervisor_agent, state)
 
 
+def backtest_node(state: ResearchWorkflowState) -> dict:
+    """Run the optional Backtest Agent with degraded-mode exception handling.
+
+    Backtest is not an AgentName in the supervisor plan; it is a standalone
+    reference node that runs once (gated by ``needs_backtest``) and then flows
+    straight into graph context, so it never re-enters the supervisor loop.
+    """
+    return _safe_node("backtest_node", run_backtest_agent, state)
+
+
 def run_graph_context_builder_node(state: ResearchWorkflowState) -> dict:
     """Build GraphContext from available EvidenceItem objects only."""
     ticker = state.get("ticker", "").strip().upper()
@@ -370,6 +386,7 @@ def build_research_graph():
     graph.add_node("market_node", market_node)
     graph.add_node("fundamental_node", fundamental_node)
     graph.add_node("news_node", news_node)
+    graph.add_node("backtest_node", backtest_node)
     graph.add_node("graph_context_node", graph_context_node)
     graph.add_node("coordinator_node", coordinator_node)
     graph.add_node("evaluator_node", evaluator_node)
@@ -392,6 +409,7 @@ def build_research_graph():
             "market_node": "market_node",
             "fundamental_node": "fundamental_node",
             "news_node": "news_node",
+            "backtest_node": "backtest_node",
             "graph_context_node": "graph_context_node",
             "coordinator_node": "coordinator_node",
         },
@@ -399,6 +417,7 @@ def build_research_graph():
     graph.add_edge("market_node", "supervisor_node")
     graph.add_edge("fundamental_node", "supervisor_node")
     graph.add_edge("news_node", "supervisor_node")
+    graph.add_edge("backtest_node", "graph_context_node")
     graph.add_edge("graph_context_node", "coordinator_node")
     graph.add_edge("coordinator_node", "evaluator_node")
     graph.add_conditional_edges(
@@ -419,8 +438,17 @@ def run_research_workflow(
     investment_horizon: str,
     risk_profile: str,
     user_query: str | None = None,
+    enable_backtest: bool = False,
+    backtest_start: str | None = None,
+    backtest_end: str | None = None,
+    backtest_params: dict | None = None,
 ) -> dict:
-    """Run the full research workflow and return API-friendly state fields."""
+    """Run the full research workflow and return API-friendly state fields.
+
+    ``enable_backtest`` opts into the optional historical-backtest reference node.
+    It is off by default so the core research flow stays deterministic and free
+    of extra network calls unless a caller explicitly requests a simulation.
+    """
     run_id = uuid4().hex
     initial_state: ResearchWorkflowState = {
         "run_id": run_id,
@@ -432,9 +460,16 @@ def run_research_workflow(
         "warnings": [],
         "rewrite_attempts": 0,
         "started_at": datetime.now(UTC),
+        "enable_backtest": enable_backtest,
     }
     if user_query is not None:
         initial_state["user_query"] = user_query
+    if backtest_start is not None:
+        initial_state["backtest_start"] = backtest_start
+    if backtest_end is not None:
+        initial_state["backtest_end"] = backtest_end
+    if backtest_params is not None:
+        initial_state["backtest_params"] = backtest_params
     final_state = build_research_graph().invoke(initial_state)
     if "run_id" not in final_state:
         final_state["run_id"] = run_id
@@ -456,6 +491,7 @@ def run_research_workflow(
         "market_analysis": final_state.get("market_analysis"),
         "fundamental_analysis": final_state.get("fundamental_analysis"),
         "news_analysis": final_state.get("news_analysis"),
+        "backtest_analysis": final_state.get("backtest_analysis"),
         "supervisor_plan": final_state.get("supervisor_plan"),
         "graph_context": final_state.get("graph_context"),
         "final_report": final_state.get("final_report"),

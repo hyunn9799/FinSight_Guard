@@ -10,7 +10,7 @@ from src.safety.forbidden_phrases import FORBIDDEN_PHRASES, REQUIRED_DISCLAIMER
 
 REWRITE_NODE = "rewrite_agent"
 EVIDENCE_ID_PATTERN = re.compile(
-    r"(?P<prefix>근거:\s*|evidence_id=)(?P<evidence_id>(?:market|fundamental|news|system)_[A-Za-z0-9_]+)"
+    r"(?P<prefix>근거:\s*|evidence_id=)(?P<evidence_id>(?:market|fundamental|news|system|backtest)_[A-Za-z0-9_]+)"
 )
 AGENT_LABELS: dict[AgentName, str] = {
     "market": "시장",
@@ -313,6 +313,7 @@ def run_rewrite_agent(state: GraphState) -> dict:
                 _ensure_graph_context_section(report, state),
                 allowed_ids,
             ),
+            "backtest_section": _strip_unknown_evidence_refs(report.backtest_section, allowed_ids),
             "scenario_analysis": _strip_unknown_evidence_refs(report.scenario_analysis, allowed_ids),
             "risk_factors": _strip_unknown_evidence_refs(_ensure_risk_factors(report, state), allowed_ids),
             "limitations": _strip_unknown_evidence_refs(_ensure_limitations(report, state), allowed_ids),

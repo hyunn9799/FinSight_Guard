@@ -16,7 +16,7 @@ from src.safety.safety_checker import (
 
 EVALUATOR_NODE = "evaluator_agent"
 EVIDENCE_ID_PATTERN = re.compile(
-    r"(?:근거:\s*|evidence_id=)\s*((?:market|fundamental|news|system)_[A-Za-z0-9_]+)"
+    r"(?:근거:\s*|evidence_id=)\s*((?:market|fundamental|news|system|backtest)_[A-Za-z0-9_]+)"
 )
 CERTAINTY_PHRASES = [
     "수익 보장",

@@ -133,6 +133,7 @@ LLM_SUPERVISOR_MODEL=gpt-4o-mini
 | Market Agent | yfinance 가격 이력 수집, MA/RSI/MACD/ATR 계산 | `MarketAnalysis`, market `EvidenceItem` |
 | Fundamental Agent | yfinance 기업/재무 지표 수집, 누락 필드 처리 | `FundamentalAnalysis`, fundamental `EvidenceItem` |
 | News Agent | Tavily/Firecrawl 또는 mock provider로 뉴스/이벤트 리스크 수집 | `NewsAnalysis`, news `EvidenceItem` |
+| Backtest Agent (옵션) | 고정 기술 규칙(커널 회귀 + RSI 다이버전스 + 볼린저 밴드)의 과거 시뮬레이션 | `BacktestAnalysis`, backtest `EvidenceItem` |
 | Graph Context Builder Lite | EvidenceItem에서 관계 그래프 컨텍스트 생성 | `GraphContext` |
 | Coordinator Agent | 분석 결과와 GraphContext를 결합해 한국어 보고서 생성 | `ResearchReport` |
 | Evaluator Agent | 안전성, 근거성, 리스크, 한계, 고지문 검수 | `EvaluationResult` |
@@ -267,7 +268,21 @@ streamlit run app.py
 http://localhost:8501
 ```
 
-현재 Streamlit UI는 ticker, 투자 기간, 위험 성향 입력을 중심으로 동작합니다. 별도 자유 질문 입력은 `run_research_workflow(..., user_query=...)`에서 지원되며, UI 연결은 후속 개선 대상입니다.
+현재 Streamlit UI는 ticker, 투자 기간, 위험 성향 입력을 중심으로 동작합니다. 별도 자유 질문 입력은 `run_research_workflow(..., user_query=...)`에서 지원되며, UI 연결은 후속 개선 대상입니다. 사이드바의 "전략 백테스트 포함" 옵션을 켜면 리서치 보고서에 과거 시뮬레이션 참고 섹션이 추가됩니다.
+
+### 멀티페이지: 전략 백테스트 Lab
+
+`pages/1_Backtest_Lab.py`는 커널 회귀 + RSI 다이버전스 + 볼린저 전략을 직접 실험하는 대화형 페이지입니다.
+
+- 수동 파라미터 슬라이더로 백테스트를 실행하고 가격·신호·RSI 차트를 확인합니다.
+- Optuna 베이지안 최적화로 과거 시뮬레이션 수익률을 최대화하는 파라미터를 탐색합니다.
+- 차트의 한글 폰트는 macOS/Linux/Windows에서 자동 탐지되며(`src/backtest/charts.configure_korean_font`), 원본의 Windows 전용 하드코딩을 대체합니다.
+
+### 멀티페이지: 한국 주식 평균 수익률
+
+`pages/2_Korean_Average.py`는 고정 파라미터로 한국 주식 바스켓 전체의 과거 시뮬레이션 수익률을 배치 실행하고 평균을 집계합니다. 종목별 실패(데이터 없음/오류)는 건너뛰고 성공 종목만 평균에 반영합니다. 배치 로직은 Streamlit과 분리된 `src/backtest/batch.run_batch_backtest`에 있으며 loader를 주입할 수 있어 단위 테스트가 가능합니다.
+
+모든 백테스트 결과는 과거 시뮬레이션 참고 정보이며 매수·매도·보유 권유나 미래 수익 보장이 아닙니다.
 
 ## FastAPI 실행
 
@@ -287,8 +302,11 @@ API 엔드포인트:
 GET  /health
 GET  /metrics
 POST /analyze
+POST /backtest
 GET  /reports/{run_id}
 ```
+
+`POST /backtest`는 `/analyze`와 동일한 리서치 워크플로우를 실행하되 과거 전략 백테스트 노드를 포함합니다. 백테스트 결과는 동일한 Coordinator/Evaluator 안전 검수를 거치며, 매수·매도·보유 권유가 아닌 과거 시뮬레이션 참고 정보로만 보고서에 포함됩니다.
 
 요청 예시:
 
@@ -310,6 +328,7 @@ result = run_research_workflow(
     investment_horizon="장기",
     risk_profile="중립형",
     user_query="최근 악재 때문에 위험해?",
+    enable_backtest=True,  # 옵션: 과거 전략 백테스트 참고 정보 포함
 )
 
 print(result["supervisor_plan"].question_type)

@@ -43,6 +43,11 @@ def normalize_price_dataframe(df: pd.DataFrame) -> pd.DataFrame:
 
     normalized = normalized[PRICE_COLUMNS].copy()
     normalized["Date"] = pd.to_datetime(normalized["Date"]).dt.date
+    # Drop incomplete bars (e.g. the current in-progress trading day) where
+    # yfinance returns a row with NaN OHLC values. Leaving them in poisons the
+    # latest-value lookups and rolling indicators (MA/RSI/MACD/ATR), producing
+    # spurious "데이터 부족" output even when valid history exists.
+    normalized = normalized.dropna(subset=["Open", "High", "Low", "Close"]).reset_index(drop=True)
     return normalized
 
 

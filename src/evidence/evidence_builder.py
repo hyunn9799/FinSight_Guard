@@ -64,6 +64,34 @@ def build_fundamental_evidence(
     )
 
 
+def build_backtest_evidence(
+    *,
+    ticker: str,
+    metric_name: str,
+    metric_value: EvidenceMetricValue,
+    description: str,
+    source_name: str = "FinSight 전략 백테스트 (과거 시뮬레이션)",
+    source_url: str | None = None,
+    collected_at: datetime | None = None,
+) -> EvidenceItem:
+    """Build evidence for a historical strategy-backtest simulation result.
+
+    Positioning: backtest outputs are technical reference material describing a
+    past simulation of a fixed rule set. They are never buy/sell/hold advice.
+    """
+    return EvidenceItem(
+        evidence_id=generate_evidence_id("backtest"),
+        source_type="backtest",
+        source_name=source_name,
+        source_url=source_url,
+        collected_at=_collected_at_or_now(collected_at),
+        ticker=ticker,
+        metric_name=metric_name,
+        metric_value=metric_value,
+        description=description,
+    )
+
+
 def build_news_evidence(
     *,
     ticker: str,

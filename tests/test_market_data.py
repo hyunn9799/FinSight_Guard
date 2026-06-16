@@ -77,6 +77,29 @@ def test_normalize_price_dataframe_returns_expected_columns() -> None:
     assert normalized.loc[0, "Date"] == date(2026, 5, 11)
 
 
+def test_normalize_price_dataframe_drops_incomplete_latest_bar() -> None:
+    # Regression: yfinance returns the current in-progress trading day as a row
+    # with NaN OHLC. It must be dropped so latest-value/rolling indicators stay
+    # valid instead of collapsing to "데이터 부족".
+    raw = pd.DataFrame(
+        {
+            "Open": [10.0, 11.0, float("nan")],
+            "High": [12.0, 13.0, float("nan")],
+            "Low": [9.5, 10.5, float("nan")],
+            "Close": [11.0, 12.0, float("nan")],
+            "Volume": [1000, 1100, 1200],
+        },
+        index=pd.to_datetime(["2026-05-11", "2026-05-12", "2026-05-13"]),
+    )
+
+    normalized = normalize_price_dataframe(raw)
+
+    assert len(normalized) == 2
+    assert normalized.loc[normalized.index[-1], "Close"] == 12.0
+    assert normalized.loc[normalized.index[-1], "Date"] == date(2026, 5, 12)
+    assert not normalized["Close"].isna().any()
+
+
 def test_validate_ticker_data_rejects_empty_dataframe() -> None:
     with pytest.raises(ValueError, match="No price data"):
         validate_ticker_data(pd.DataFrame())
