@@ -1,0 +1,1 @@
+/Users/underwater05187808/dev/FinSight_Guard/.claude/skills/gstack/gstack-upgrade/SKILL.md
