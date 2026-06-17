@@ -93,6 +93,22 @@
 - **FR-004**: System MUST [data requirement, e.g., "persist user preferences"]
 - **FR-005**: System MUST [behavior, e.g., "log all security events"]
 
+### Safety, Evidence & Reliability Requirements *(mandatory for research workflow changes)*
+
+- **SER-001**: System MUST avoid direct buy/sell/hold recommendations, trading
+  instructions, guaranteed return claims, guaranteed target claims, and order
+  execution behavior.
+- **SER-002**: System MUST back important numeric or factual report claims with
+  `EvidenceItem` records when the feature affects research output.
+- **SER-003**: Final Korean reports MUST include the required education-only,
+  no-recommendation disclaimer exactly as defined in the constitution.
+- **SER-004**: System MUST disclose unavailable or degraded market, fundamental,
+  or news data instead of fabricating missing facts.
+- **SER-005**: Workflow-affecting features MUST define deterministic behavior for
+  validation failure, provider failure, evaluator failure, and rewrite limits.
+- **SER-006**: Runtime-affecting features MUST preserve structured logs, report
+  storage, health checks, and metrics required by the constitution.
+
 *Example of marking unclear requirements:*
 
 - **FR-006**: System MUST authenticate users via [NEEDS CLARIFICATION: auth method not specified - email/password, SSO, OAuth?]
@@ -116,6 +132,8 @@
 - **SC-002**: [Measurable metric, e.g., "System handles 1000 concurrent users without degradation"]
 - **SC-003**: [User satisfaction metric, e.g., "90% of users successfully complete primary task on first attempt"]
 - **SC-004**: [Business metric, e.g., "Reduce support tickets related to [X] by 50%"]
+- **SC-005**: [Safety/evidence metric, e.g., "Evaluator rejects reports missing the
+  required disclaimer or citing nonexistent evidence IDs"]
 
 ## Assumptions
 

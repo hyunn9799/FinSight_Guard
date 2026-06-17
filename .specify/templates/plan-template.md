@@ -40,7 +40,20 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+- Evidence grounding: important numeric or factual claims map to `EvidenceItem`
+  records and the report includes an evidence summary.
+- Financial safety: no buy/sell/hold recommendation, no trading/order execution,
+  no guaranteed returns or target guarantees, and the required Korean disclaimer
+  is preserved for final reports.
+- LangGraph workflow: role-based agents, conditional routing, retry/fallback
+  behavior, Evaluator pass/fail routing, and max two Rewrite attempts are
+  represented when the feature touches workflow behavior.
+- Deterministic quality: relevant tests avoid live external APIs and cover safety,
+  evaluator, routing, indicators, storage, and API behavior as applicable.
+- Observability: structured logs, report persistence, health checks, and metrics
+  remain available for affected workflow paths.
+
+**Constitution Result**: [PASS/FAIL with notes and any justified exceptions]
 
 ## Project Structure
 
