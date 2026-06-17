@@ -180,6 +180,20 @@ After editing:
 2. Run relevant tests.
 3. Summarize changed files and remaining TODOs.
 
+## GitHub Issue Rules
+
+All GitHub issues for this repository must be written in natural Korean.
+
+When converting Spec Kit tasks into GitHub issues, do not create one issue per
+T### task by default. Group tasks by phase, user story, or implementation
+milestone, and include the detailed T### task IDs inside the issue body as an
+included-work section or checklist.
+
+For large features, create or maintain a high-level MVP tracking issue that
+summarizes the first practical delivery slice. If too many detailed issues
+already exist, close them with a comment linking to the grouped issue instead of
+deleting them.
+
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
