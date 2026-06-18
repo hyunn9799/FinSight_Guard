@@ -105,6 +105,16 @@ def save_report_markdown(run_id: str, report: Any) -> str:
     return str(path)
 
 
+def save_optimization_run(run_id: str, run: Any) -> str:
+    """Persist an OptimizationRun as JSON and return the file path."""
+    REPORT_DIR.mkdir(parents=True, exist_ok=True)
+    ticker = _safe_filename_part(_extract_ticker(run))
+    filename = f"{_safe_filename_part(run_id)}_{ticker}_{_timestamp()}.json"
+    path = REPORT_DIR / filename
+    path.write_text(json.dumps(_to_jsonable(run), ensure_ascii=False, indent=2), encoding="utf-8")
+    return str(path)
+
+
 def load_report_json(path: str | Path) -> dict:
     """Load a saved report JSON file."""
     return json.loads(Path(path).read_text(encoding="utf-8"))
