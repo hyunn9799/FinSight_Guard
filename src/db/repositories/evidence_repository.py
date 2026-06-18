@@ -15,6 +15,14 @@ class EvidenceRepository(BaseRepository):
         analysis_result_id=None,
         source_document_id=None,
     ) -> EvidenceItemRecord:
+        existing = (
+            self.session.query(EvidenceItemRecord)
+            .filter(EvidenceItemRecord.evidence_id == item.evidence_id)
+            .one_or_none()
+        )
+        if existing is not None:
+            return existing
+
         metric_value = None if item.metric_value is None else {"value": item.metric_value}
         record = EvidenceItemRecord(
             evidence_id=item.evidence_id,

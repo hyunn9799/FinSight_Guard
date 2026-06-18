@@ -42,6 +42,17 @@ def test_upsert_ticker_is_idempotent_and_uppercases(db_session):
 
 
 @REQUIRES_DB
+def test_upsert_ticker_is_idempotent_with_null_market(db_session):
+    from src.db.repositories.analysis_repository import AnalysisRepository
+
+    repo = AnalysisRepository(db_session)
+    a = repo.upsert_ticker("aapl")
+    b = repo.upsert_ticker("AAPL")
+    assert a.id == b.id
+    assert a.market is None
+
+
+@REQUIRES_DB
 def test_request_node_run_result_lifecycle(db_session):
     from src.db.repositories.analysis_repository import AnalysisRepository
     repo = AnalysisRepository(db_session)
@@ -133,6 +144,30 @@ def test_add_evidence_from_pydantic_and_cite(db_session):
     version = reports.add_version(report.id, 1, "draft", {"k": "v"}, "md", created_by_node="coordinator_node")
     citation = ev_repo.add_citation(version.id, row.id, section_name="market", claim_text="close is 190.5")
     assert citation.id is not None
+
+
+@REQUIRES_DB
+def test_add_evidence_is_idempotent_by_evidence_id(db_session):
+    from datetime import UTC, datetime
+
+    from src.db.repositories.evidence_repository import EvidenceRepository
+    from src.evidence.evidence_schema import EvidenceItem
+
+    repo = EvidenceRepository(db_session)
+    item = EvidenceItem(
+        evidence_id="ev-dupe",
+        source_type="market",
+        source_name="yfinance",
+        collected_at=datetime.now(UTC),
+        ticker="AAPL",
+        metric_name="close",
+        metric_value=190.5,
+        description="closing price",
+    )
+    first = repo.add_evidence(item)
+    second = repo.add_evidence(item)
+
+    assert first.id == second.id
 
 
 @REQUIRES_DB

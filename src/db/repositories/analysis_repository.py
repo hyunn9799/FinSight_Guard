@@ -2,6 +2,8 @@
 
 from datetime import datetime
 
+from sqlalchemy.exc import IntegrityError
+
 from src.db.models import (
     AnalysisRequest,
     AnalysisResult,
@@ -22,10 +24,18 @@ class AnalysisRepository(BaseRepository):
         )
         if existing is not None:
             return existing
-        ticker = Ticker(symbol=symbol, market=market, **fields)
-        self.session.add(ticker)
-        self.session.flush()
-        return ticker
+        try:
+            with self.session.begin_nested():
+                ticker = Ticker(symbol=symbol, market=market, **fields)
+                self.session.add(ticker)
+                self.session.flush()
+                return ticker
+        except IntegrityError:
+            return (
+                self.session.query(Ticker)
+                .filter(Ticker.symbol == symbol, Ticker.market == market)
+                .one()
+            )
 
     def create_request(
         self,

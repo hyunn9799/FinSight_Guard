@@ -106,6 +106,34 @@ def test_completed_supervisor_plan_routes_to_graph_context_node() -> None:
     assert route_after_supervisor(state) == "graph_context_node"
 
 
+def test_run_research_workflow_returns_persisted_ids(monkeypatch) -> None:
+    import uuid
+    import src.graph.workflow as workflow
+
+    request_id = uuid.uuid4()
+    report_id = uuid.uuid4()
+    version_id = uuid.uuid4()
+
+    class FakeGraph:
+        def invoke(self, state):
+            return {
+                **state,
+                "status": "success",
+                "request_id": request_id,
+                "report_id": report_id,
+                "report_version_id": version_id,
+                "report_path": "reports/run.json",
+            }
+
+    monkeypatch.setattr(workflow, "build_research_graph", lambda: FakeGraph())
+
+    result = run_research_workflow("AAPL", "장기", "중립형")
+
+    assert result["request_id"] == request_id
+    assert result["report_id"] == report_id
+    assert result["report_version_id"] == version_id
+
+
 def test_rewrite_agent_removes_unsafe_language_and_adds_required_sections() -> None:
     state = {
         "draft_report": _unsafe_report(),

@@ -423,6 +423,7 @@ def save_report_node(state: ResearchWorkflowState) -> dict:
         "report_path": report_path,
         "request_id": persisted.get("request_id"),
         "report_id": persisted.get("report_id"),
+        "report_version_id": persisted.get("report_version_id"),
         "completed_at": datetime.now(UTC),
     }
 
@@ -550,4 +551,7 @@ def run_research_workflow(
         "errors": final_state.get("errors", []),
         "warnings": final_state.get("warnings", []),
         "report_path": final_state.get("report_path"),
+        "request_id": final_state.get("request_id"),
+        "report_id": final_state.get("report_id"),
+        "report_version_id": final_state.get("report_version_id"),
     }

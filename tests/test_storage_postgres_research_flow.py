@@ -92,6 +92,63 @@ def test_persist_degraded_run_keeps_missing_notes(db_session, monkeypatch):
 
 
 @REQUIRES_DB
+def test_persist_failed_evaluation_records_safety_fail(db_session, monkeypatch):
+    import src.db.persistence as persistence
+    from contextlib import contextmanager
+
+    @contextmanager
+    def _scope():
+        yield db_session
+
+    monkeypatch.setattr(persistence, "session_scope", _scope)
+
+    out = persistence.persist_research_run(
+        run_id="run-fail",
+        ticker="AAPL",
+        status="failed",
+        report=_sample_report(),
+        evidence=[],
+        evaluation={"overall_pass": False, "source_grounding_score": 0.25},
+    )
+
+    from src.db.models import Report
+
+    report = db_session.get(Report, out["report_id"])
+    assert report.safety_status == "fail"
+    assert report.evaluation_score == 0.25
+
+
+@REQUIRES_DB
+def test_persist_research_run_accepts_dict_report(db_session, monkeypatch):
+    import src.db.persistence as persistence
+    from contextlib import contextmanager
+
+    @contextmanager
+    def _scope():
+        yield db_session
+
+    monkeypatch.setattr(persistence, "session_scope", _scope)
+
+    report = _sample_report().model_dump(mode="json")
+    out = persistence.persist_research_run(
+        run_id="run-dict",
+        ticker="AAPL",
+        status="success",
+        report=report,
+        evidence=[],
+        evaluation={"overall_pass": True, "source_grounding_score": 0.9},
+    )
+
+    from src.db.models import Report, ReportVersion
+
+    report_row = db_session.get(Report, out["report_id"])
+    version = db_session.get(ReportVersion, out["report_version_id"])
+    assert report_row.title == "AAPL 리서치"
+    assert report_row.safety_status == "pass"
+    assert version.report_json["ticker"] == "AAPL"
+
+
+@REQUIRES_DB
 def test_save_report_node_persists_then_exports(db_session, monkeypatch, tmp_path):
     import src.db.persistence as persistence
     import src.graph.workflow as workflow

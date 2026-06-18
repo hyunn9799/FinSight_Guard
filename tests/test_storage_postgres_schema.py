@@ -48,16 +48,31 @@ def test_metadata_has_exactly_us1_tables():
 def test_key_unique_constraints_declared():
     from src.db.models import Base
     tickers = Base.metadata.tables["tickers"]
+    ticker_unique = next(
+        con
+        for con in tickers.constraints
+        if con.__class__.__name__ == "UniqueConstraint"
+        and tuple(sorted(c.name for c in con.columns)) == ("market", "symbol")
+    )
     uniques = {tuple(sorted(c.name for c in con.columns))
                for con in tickers.constraints
                if con.__class__.__name__ == "UniqueConstraint"}
     assert ("market", "symbol") in uniques
+    assert ticker_unique.dialect_options["postgresql"]["nulls_not_distinct"] is True
 
     versions = Base.metadata.tables["report_versions"]
     v_uniques = {tuple(sorted(c.name for c in con.columns))
                  for con in versions.constraints
                  if con.__class__.__name__ == "UniqueConstraint"}
     assert ("report_id", "version_number") in v_uniques
+
+
+def test_evaluation_score_columns_return_float_values():
+    from src.db.models import Base
+
+    for table_name in ("workflow_node_runs", "reports", "structured_log_events"):
+        column = Base.metadata.tables[table_name].c.evaluation_score
+        assert column.type.asdecimal is False
 
 
 @REQUIRES_DB

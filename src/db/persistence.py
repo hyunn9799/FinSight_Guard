@@ -13,6 +13,26 @@ _RESULT_STATUS_FOR = {
 }
 
 
+def _read_value(value, key: str, default=None):
+    if isinstance(value, dict):
+        return value.get(key, default)
+    return getattr(value, key, default)
+
+
+def _report_json(report) -> dict:
+    if isinstance(report, dict):
+        return report
+    return report.model_dump(mode="json")
+
+
+def _evaluation_summary(evaluation) -> tuple[float | None, str]:
+    if evaluation is None:
+        return None, "not_evaluated"
+    eval_score = _read_value(evaluation, "source_grounding_score")
+    overall_pass = bool(_read_value(evaluation, "overall_pass", False))
+    return eval_score, "pass" if overall_pass else "fail"
+
+
 def persist_research_run(
     *,
     run_id: str,
@@ -61,20 +81,21 @@ def persist_research_run(
 
         stage = "final" if status == "success" else "draft"
         report_status = "final" if status == "success" else "draft"
+        report_title = _read_value(report, "title", "")
         report_row = reports.create_report(
-            request.id, ticker_row.id, title=getattr(report, "title", ""), status=report_status
+            request.id, ticker_row.id, title=report_title, status=report_status
         )
         version = reports.add_version(
             report_row.id,
             1,
             stage,
-            report.model_dump(mode="json"),
+            _report_json(report),
             "",
             created_by_node="coordinator_node",
         )
-        disclaimer_present = bool(getattr(report, "disclaimer", "").strip())
-        eval_score = evaluation.source_grounding_score if evaluation is not None else None
-        safety = "pass" if (evaluation is not None and evaluation.overall_pass) else "not_evaluated"
+        disclaimer = _read_value(report, "disclaimer", "")
+        disclaimer_present = bool(disclaimer.strip()) if isinstance(disclaimer, str) else False
+        eval_score, safety = _evaluation_summary(evaluation)
         reports.set_status(
             report_row.id,
             safety_status=safety,

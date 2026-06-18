@@ -46,7 +46,7 @@ class User(UUIDMixin, TimestampMixin, Base):
 
 class Ticker(UUIDMixin, TimestampMixin, Base):
     __tablename__ = "tickers"
-    __table_args__ = (UniqueConstraint("symbol", "market"),)
+    __table_args__ = (UniqueConstraint("symbol", "market", postgresql_nulls_not_distinct=True),)
     symbol: Mapped[str] = mapped_column(String, nullable=False)
     market: Mapped[str | None] = mapped_column(String, nullable=True)
     exchange: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -90,7 +90,7 @@ class WorkflowNodeRun(UUIDMixin, Base):
     duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     error_type: Mapped[str | None] = mapped_column(String, nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
-    evaluation_score: Mapped[float | None] = mapped_column(Numeric, nullable=True)
+    evaluation_score: Mapped[float | None] = mapped_column(Numeric(asdecimal=False), nullable=True)
     node_metadata: Mapped[dict] = mapped_column("metadata", JSONB, default=dict, nullable=False)
 
 
@@ -121,7 +121,7 @@ class Report(UUIDMixin, TimestampMixin, Base):
     language: Mapped[str] = mapped_column(String, default="ko", nullable=False)
     status: Mapped[str] = mapped_column(String, nullable=False)
     safety_status: Mapped[str] = mapped_column(String, default="not_evaluated", nullable=False)
-    evaluation_score: Mapped[float | None] = mapped_column(Numeric, nullable=True)
+    evaluation_score: Mapped[float | None] = mapped_column(Numeric(asdecimal=False), nullable=True)
     disclaimer_present: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
 
@@ -217,6 +217,6 @@ class StructuredLogEvent(UUIDMixin, Base):
     status: Mapped[str] = mapped_column(String, nullable=False)
     message: Mapped[str | None] = mapped_column(Text, nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
-    evaluation_score: Mapped[float | None] = mapped_column(Numeric, nullable=True)
+    evaluation_score: Mapped[float | None] = mapped_column(Numeric(asdecimal=False), nullable=True)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     event_metadata: Mapped[dict] = mapped_column("metadata", JSONB, default=dict, nullable=False)

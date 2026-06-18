@@ -30,7 +30,7 @@ def upgrade() -> None:
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_tickers')),
-    sa.UniqueConstraint('symbol', 'market', name=op.f('uq_tickers_symbol'))
+    sa.UniqueConstraint('symbol', 'market', name=op.f('uq_tickers_symbol'), postgresql_nulls_not_distinct=True)
     )
     op.create_table('users',
     sa.Column('email', sa.String(), nullable=True),
@@ -121,7 +121,7 @@ def upgrade() -> None:
     sa.Column('language', sa.String(), nullable=False),
     sa.Column('status', sa.String(), nullable=False),
     sa.Column('safety_status', sa.String(), nullable=False),
-    sa.Column('evaluation_score', sa.Numeric(), nullable=True),
+    sa.Column('evaluation_score', sa.Numeric(asdecimal=False), nullable=True),
     sa.Column('disclaimer_present', sa.Boolean(), nullable=False),
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
@@ -140,7 +140,7 @@ def upgrade() -> None:
     sa.Column('status', sa.String(), nullable=False),
     sa.Column('message', sa.Text(), nullable=True),
     sa.Column('error_message', sa.Text(), nullable=True),
-    sa.Column('evaluation_score', sa.Numeric(), nullable=True),
+    sa.Column('evaluation_score', sa.Numeric(asdecimal=False), nullable=True),
     sa.Column('occurred_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('metadata', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
     sa.Column('id', sa.UUID(), nullable=False),
@@ -159,7 +159,7 @@ def upgrade() -> None:
     sa.Column('duration_ms', sa.Integer(), nullable=True),
     sa.Column('error_type', sa.String(), nullable=True),
     sa.Column('error_message', sa.Text(), nullable=True),
-    sa.Column('evaluation_score', sa.Numeric(), nullable=True),
+    sa.Column('evaluation_score', sa.Numeric(asdecimal=False), nullable=True),
     sa.Column('metadata', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
     sa.Column('id', sa.UUID(), nullable=False),
     sa.ForeignKeyConstraint(['request_id'], ['analysis_requests.id'], name=op.f('fk_workflow_node_runs_request_id_analysis_requests')),
