@@ -315,3 +315,151 @@ def compute_final_robust_score(
         "stability_turnover_penalty": round(c_stab, 4),
     }
     return float(score), components
+
+
+# ---------------------------------------------------------------------------
+# Walk-forward orchestration
+# ---------------------------------------------------------------------------
+
+def _aggregate_fold_metrics(fold_oos_metrics: list[CandidateMetrics]) -> CandidateMetrics:
+    if not fold_oos_metrics:
+        return CandidateMetrics()
+    returns = [m.cost_adjusted_return_pct for m in fold_oos_metrics]
+    sharpes = [m.sharpe or 0.0 for m in fold_oos_metrics]
+    mdds = [m.max_drawdown_pct for m in fold_oos_metrics]
+    trades = sum(m.completed_trades for m in fold_oos_metrics)
+    return CandidateMetrics(
+        cost_adjusted_return_pct=float(np.median(returns)),
+        total_return_pct=float(np.median(returns)),
+        max_drawdown_pct=float(max(mdds)),
+        sharpe=float(np.mean(sharpes)) if sharpes else None,
+        completed_trades=trades,
+        median_oos_return_pct=float(np.median(returns)),
+        worst_fold_return_pct=float(min(returns)),
+        fold_return_stddev=float(np.std(returns)) if len(returns) > 1 else 0.0,
+    )
+
+
+def run_walk_forward_optimization(
+    df: pd.DataFrame,
+    *,
+    ticker: str,
+    run_id: Optional[str] = None,
+    initial_balance: float,
+    config: WalkForwardConfig,
+    cost: CostAssumptions,
+    policy: RobustScoringPolicy,
+    n_trials: int = 30,
+    manual_params: Optional[dict] = None,
+) -> OptimizationRun:
+    """Full walk-forward optimization pipeline."""
+    import uuid as _uuid
+    from src.backtest.optimizer import robust_optimize_window
+    from src.backtest.strategy import BacktestParams, run_backtest
+
+    run_id = run_id or str(_uuid.uuid4())
+    start_str = df.index[0].strftime("%Y-%m-%d")
+    end_str = df.index[-1].strftime("%Y-%m-%d")
+
+    fold_windows = generate_fold_windows(start_str, end_str, config)
+    if len(fold_windows) < config.minimum_valid_test_folds:
+        return OptimizationRun(
+            run_id=run_id, ticker=ticker, start=start_str, end=end_str,
+            initial_balance=initial_balance, cost_assumptions=cost,
+            scoring_policy=policy, fold_setup=config,
+            status="insufficient_data",
+            warnings=[
+                f"Walk-forward validation produced {len(fold_windows)} fold(s); "
+                f"minimum {config.minimum_valid_test_folds} required for robust output.",
+                "결과를 robust parameter로 표시하지 않습니다.",
+            ],
+        )
+
+    folds: list[WalkForwardFold] = []
+    fold_oos_metrics: list[CandidateMetrics] = []
+    best_fold_params: dict = {}
+
+    for fw in fold_windows:
+        train_mask = (df.index >= fw["train_start"]) & (df.index <= fw["train_end"])
+        test_mask = (df.index >= fw["test_start"]) & (df.index <= fw["test_end"])
+        train_df = df.loc[train_mask]
+        test_df = df.loc[test_mask]
+
+        if len(train_df) < 20 or len(test_df) < 5:
+            folds.append(WalkForwardFold(
+                fold_index=fw["fold_index"],
+                train_start=fw["train_start"], train_end=fw["train_end"],
+                test_start=fw["test_start"], test_end=fw["test_end"],
+                selected_params={}, status="missing_data",
+                warnings=["Insufficient data in this fold window."],
+            ))
+            continue
+
+        try:
+            best_params, _ = robust_optimize_window(
+                train_df, initial_balance=initial_balance, cost=cost, n_trials=n_trials
+            )
+        except Exception as exc:
+            folds.append(WalkForwardFold(
+                fold_index=fw["fold_index"],
+                train_start=fw["train_start"], train_end=fw["train_end"],
+                test_start=fw["test_start"], test_end=fw["test_end"],
+                selected_params={}, status="invalid",
+                warnings=[f"Optimization failed: {exc}"],
+            ))
+            continue
+
+        oos_result = run_backtest(
+            test_df, BacktestParams.from_dict(best_params),
+            initial_balance, cost.total_one_way_fee
+        )
+        oos_metrics = compute_candidate_metrics(oos_result, initial_balance, cost)
+
+        fold_status: FoldStatus = "valid" if oos_metrics.completed_trades > 0 else "no_trades"
+        fold = WalkForwardFold(
+            fold_index=fw["fold_index"],
+            train_start=fw["train_start"], train_end=fw["train_end"],
+            test_start=fw["test_start"], test_end=fw["test_end"],
+            selected_params=best_params, candidate_metrics=oos_metrics, status=fold_status,
+        )
+        folds.append(fold)
+        if fold_status == "valid":
+            fold_oos_metrics.append(oos_metrics)
+            best_fold_params = best_params
+
+    valid_count = len(fold_oos_metrics)
+    if valid_count < config.minimum_valid_test_folds:
+        return OptimizationRun(
+            run_id=run_id, ticker=ticker, start=start_str, end=end_str,
+            initial_balance=initial_balance, cost_assumptions=cost,
+            scoring_policy=policy, fold_setup=config,
+            status="insufficient_data", folds=folds,
+            warnings=[
+                f"Only {valid_count} valid OOS fold(s); {config.minimum_valid_test_folds} required.",
+                "결과는 과거 시뮬레이션이며 매수·매도·보유 권유가 아닙니다.",
+            ],
+        )
+
+    agg_metrics = _aggregate_fold_metrics(fold_oos_metrics)
+    score, components = compute_final_robust_score(fold_oos_metrics, policy)
+    label_allowed = compute_robust_label_allowed(agg_metrics)
+
+    candidate = ParameterCandidateResult(
+        params=best_fold_params,
+        score=score,
+        score_components=components,
+        metrics=agg_metrics,
+        fold_metrics=fold_oos_metrics,
+        robust_label_allowed=label_allowed,
+        warnings=[] if label_allowed else [
+            "Guardrail: candidate does not meet minimum trade count or MDD threshold."
+        ],
+    )
+
+    return OptimizationRun(
+        run_id=run_id, ticker=ticker, start=start_str, end=end_str,
+        initial_balance=initial_balance, cost_assumptions=cost,
+        scoring_policy=policy, fold_setup=config,
+        status="success", folds=folds, robust_candidate=candidate,
+        warnings=["결과는 과거 시뮬레이션이며 매수·매도·보유 권유가 아닙니다."],
+    )

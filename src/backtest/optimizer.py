@@ -14,6 +14,11 @@ import optuna
 import pandas as pd
 
 from src.backtest.strategy import BacktestParams, run_backtest
+from src.backtest.robust import (
+    CandidateMetrics, CostAssumptions,
+    compute_candidate_metrics, compute_train_trial_score,
+    passes_train_trial_filter,
+)
 
 # Quiet Optuna's per-trial logging; callers drive their own progress reporting.
 optuna.logging.set_verbosity(optuna.logging.WARNING)
@@ -98,3 +103,39 @@ def optimize_backtest(
         n_trials=int(n_trials),
         completed_trials=completed,
     )
+
+
+def robust_optimize_window(
+    df: pd.DataFrame,
+    *,
+    initial_balance: float,
+    cost: CostAssumptions,
+    n_trials: int = 30,
+    search_space: SearchSpace | None = None,
+) -> tuple[dict, CandidateMetrics]:
+    """Run Optuna on `df` using train_trial_score (not total return). Return best params + metrics."""
+    space = search_space or SearchSpace()
+
+    best_params: dict = {}
+    best_score = float("-inf")
+    best_metrics: CandidateMetrics = CandidateMetrics()
+
+    def objective(trial: optuna.Trial) -> float:
+        nonlocal best_params, best_score, best_metrics
+        params = _suggest_params(trial, space)
+        result = run_backtest(
+            df, BacktestParams.from_dict(params), initial_balance, cost.total_one_way_fee
+        )
+        metrics = compute_candidate_metrics(result, initial_balance, cost)
+        if not passes_train_trial_filter(metrics):
+            return float("-inf")
+        score = compute_train_trial_score(metrics)
+        if score > best_score:
+            best_score = score
+            best_params = params
+            best_metrics = metrics
+        return score
+
+    study = optuna.create_study(direction="maximize")
+    study.optimize(objective, n_trials=int(n_trials))
+    return best_params, best_metrics

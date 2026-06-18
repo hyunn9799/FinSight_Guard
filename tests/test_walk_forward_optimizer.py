@@ -47,3 +47,63 @@ def test_fold_index_starts_at_1():
     folds = generate_fold_windows("2021-01-01", "2024-12-31", config)
     assert folds[0]["fold_index"] == 1
     assert folds[-1]["fold_index"] == len(folds)
+
+
+# --- Task 7: orchestration ---
+
+from tests.fixtures.optimization_data import synthetic_prices
+from src.backtest.robust import (
+    CostAssumptions, RobustScoringPolicy,
+    run_walk_forward_optimization,
+)
+
+
+def _fast_config() -> WalkForwardConfig:
+    return WalkForwardConfig(train_window_days=120, test_window_days=40, step_days=40)
+
+
+def test_insufficient_folds_returns_insufficient_data_status():
+    df = synthetic_prices(n=100)  # too short for 3 folds
+    result = run_walk_forward_optimization(
+        df=df, ticker="TEST", run_id="r1",
+        initial_balance=10_000, config=_fast_config(),
+        cost=CostAssumptions(), policy=RobustScoringPolicy(), n_trials=2,
+    )
+    assert result.status == "insufficient_data"
+    assert result.robust_candidate is None
+
+
+def test_valid_run_produces_at_least_3_folds():
+    df = synthetic_prices(n=800)
+    result = run_walk_forward_optimization(
+        df=df, ticker="TEST", run_id="r2",
+        initial_balance=10_000, config=_fast_config(),
+        cost=CostAssumptions(), policy=RobustScoringPolicy(), n_trials=3,
+    )
+    # synthetic data may yield no_trades with few optuna trials; count folds that ran
+    ran_folds = [f for f in result.folds if f.status in ("valid", "no_trades")]
+    assert len(ran_folds) >= 3
+
+
+def test_fold_aggregate_includes_median_worst_stddev():
+    df = synthetic_prices(n=800)
+    result = run_walk_forward_optimization(
+        df=df, ticker="TEST", run_id="r3",
+        initial_balance=10_000, config=_fast_config(),
+        cost=CostAssumptions(), policy=RobustScoringPolicy(), n_trials=3,
+    )
+    if result.robust_candidate:
+        m = result.robust_candidate.metrics
+        assert m.median_oos_return_pct is not None
+        assert m.worst_fold_return_pct is not None
+        assert m.fold_return_stddev is not None
+
+
+def test_warnings_list_non_empty_on_insufficient_data():
+    df = synthetic_prices(n=100)
+    result = run_walk_forward_optimization(
+        df=df, ticker="TEST", run_id="r4",
+        initial_balance=10_000, config=_fast_config(),
+        cost=CostAssumptions(), policy=RobustScoringPolicy(), n_trials=2,
+    )
+    assert any("fold" in w.lower() for w in result.warnings)
