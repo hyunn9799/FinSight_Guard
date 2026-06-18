@@ -262,3 +262,28 @@ def test_full_workflow_success_path_with_mocked_agents(monkeypatch, tmp_path) ->
     assert result["report_path"].endswith("_AAPL_report.json")
     assert Path(result["report_path"]).exists()
     assert calls == ["market", "fundamental", "news", "graph_context", "coordinator"]
+
+
+
+def test_optimization_evaluator_failure_returns_completed_degraded():
+    """After max rewrites, status must be completed_degraded with evaluator_errors."""
+    from src.backtest.robust import OptimizationRun, WalkForwardConfig
+    run = OptimizationRun(
+        run_id="test", ticker="AAPL", start="2022-01-01", end="2022-12-31",
+        initial_balance=10_000,
+        fold_setup=WalkForwardConfig(train_window_days=180, test_window_days=60, step_days=60),
+    )
+    run.status = "completed_degraded"
+    run.evaluator_errors = ["limitation_missing", "unsupported_claim"]
+    assert run.status == "completed_degraded"
+    assert len(run.evaluator_errors) == 2
+
+
+def test_rewrite_does_not_change_evidence_ids():
+    """Rewrite agent must preserve evidence_id references."""
+    import re
+    text = "OOS 수익률은 opt_abc12345678에 기록되었습니다. 과거 시뮬레이션 결과입니다."
+    evidence_ids_before = set(re.findall(r"opt_[a-f0-9]+", text))
+    rewritten = text.replace("기록되었습니다", "나타났습니다")
+    evidence_ids_after = set(re.findall(r"opt_[a-f0-9]+", rewritten))
+    assert evidence_ids_before == evidence_ids_after

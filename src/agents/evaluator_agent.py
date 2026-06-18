@@ -400,3 +400,43 @@ def run_evaluator_agent(state: GraphState) -> dict:
         "status": "success" if result.overall_pass else "degraded",
         "evaluation_result": result,
     }
+
+
+# ---------------------------------------------------------------------------
+# Optimization-specific checks
+# ---------------------------------------------------------------------------
+
+from src.backtest.robust import FORBIDDEN_OPTIMIZATION_PHRASES, STRONG_POSITIVE_PHRASES  # noqa: E402
+
+_LIMITATION_PHRASES = ["과거 시뮬레이션", "historical simulation", "연구 목적", "권유가 아닙니다"]
+_NUMERIC_PATTERN = re.compile(r"\d+\.?\d*%")
+
+
+def check_optimization_section(
+    optimization_text: str,
+    evidence_ids: list[str],
+    robust_label_allowed: bool = True,
+) -> dict:
+    """Check optimization text for 4 safety conditions. Returns {pass, errors}."""
+    errors: list[str] = []
+    lower = optimization_text.lower()
+
+    numerics = _NUMERIC_PATTERN.findall(optimization_text)
+    if numerics and not any(eid in optimization_text for eid in evidence_ids):
+        errors.append("unsupported_claim")
+
+    if not any(phrase in optimization_text for phrase in _LIMITATION_PHRASES):
+        errors.append("limitation_missing")
+
+    for phrase in FORBIDDEN_OPTIMIZATION_PHRASES:
+        if phrase.lower() in lower:
+            errors.append(f"forbidden_phrase:{phrase}")
+            break
+
+    if not robust_label_allowed:
+        for phrase in STRONG_POSITIVE_PHRASES:
+            if phrase.lower() in lower:
+                errors.append("strong_expression_guardrail_failed")
+                break
+
+    return {"pass": len(errors) == 0, "errors": errors}

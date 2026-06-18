@@ -247,3 +247,48 @@ def test_evaluator_returns_failed_result_when_report_is_missing() -> None:
     assert result["status"] == "failed"
     assert evaluation.overall_pass is False
     assert result["errors"][0].error_type == "evaluation_input_error"
+
+
+# --- Optimization-specific evaluator checks ---
+
+def test_evaluator_fails_on_unsupported_claim_in_optimization():
+    from src.agents.evaluator_agent import check_optimization_section
+    result = check_optimization_section(
+        optimization_text="OOS 수익률은 15.3%입니다.",
+        evidence_ids=[],
+    )
+    assert result["pass"] is False
+    assert "unsupported_claim" in result["errors"]
+
+
+def test_evaluator_fails_on_missing_limitation():
+    from src.agents.evaluator_agent import check_optimization_section
+    result = check_optimization_section(
+        optimization_text="이 파라미터는 최고의 성과를 보입니다.",
+        evidence_ids=["opt_abc123"],
+    )
+    assert result["pass"] is False
+    assert "limitation_missing" in result["errors"]
+
+
+def test_evaluator_fails_on_strong_expression_when_guardrail_failed():
+    from src.agents.evaluator_agent import check_optimization_section
+    result = check_optimization_section(
+        optimization_text="이 파라미터는 우수한 성과를 보였으며 투자에 적합합니다.",
+        evidence_ids=["opt_abc123"],
+        robust_label_allowed=False,
+    )
+    assert result["pass"] is False
+
+
+def test_evaluator_passes_safe_optimization_text():
+    from src.agents.evaluator_agent import check_optimization_section
+    result = check_optimization_section(
+        optimization_text=(
+            "과거 시뮬레이션 결과 OOS 수익률 중앙값은 opt_abc123에 기록되었습니다. "
+            "이 결과는 연구 목적이며 매수·매도·보유 권유가 아닙니다."
+        ),
+        evidence_ids=["opt_abc123"],
+        robust_label_allowed=True,
+    )
+    assert result["pass"] is True

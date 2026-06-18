@@ -7,6 +7,7 @@ from typing import Any
 
 import streamlit as st
 
+from src.backtest.data_loader import load_price_history
 from src.graph.workflow import run_research_workflow
 
 
@@ -215,6 +216,16 @@ def main() -> None:
                     risk_profile=risk_profile,
                     enable_backtest=enable_backtest,
                 )
+                st.session_state["ticker"] = ticker
+                if enable_backtest:
+                    try:
+                        from datetime import UTC, datetime, timedelta
+                        end_date = datetime.now(UTC).date().isoformat()
+                        start_date = (datetime.now(UTC).date() - timedelta(days=400)).isoformat()
+                        st.session_state["price_df"] = load_price_history(ticker, start_date, end_date)
+                        st.session_state["initial_balance"] = 10_000.0
+                    except Exception:
+                        pass
         except Exception as exc:
             st.session_state["workflow_result"] = None
             st.error("워크플로우 실행 중 오류가 발생했습니다. 입력값과 로그를 확인해 주세요.")
@@ -297,12 +308,129 @@ def main() -> None:
                     ("신호 요약", "signal_summary"),
                 ],
             )
+
+        st.divider()
+        st.subheader("Walk-Forward 강건 최적화 (과거 시뮬레이션 연구 전용)")
+        st.caption("결과는 과거 데이터 시뮬레이션이며 매수·매도·보유 권유가 아닙니다.")
+
+        with st.expander("강건 최적화 설정", expanded=False):
+            wf_train = st.number_input("학습 윈도우 (일)", min_value=60, max_value=720, value=360, step=30)
+            wf_test = st.number_input("테스트 윈도우 (일)", min_value=30, max_value=180, value=90, step=30)
+            wf_step = st.number_input("스텝 (일)", min_value=30, max_value=180, value=90, step=30)
+            wf_trials = st.slider("Optuna 시도 횟수", min_value=5, max_value=50, value=20)
+            fee_pct = st.number_input("편도 수수료 (%)", min_value=0.0, max_value=1.0, value=0.05, step=0.01)
+            slippage_pct = st.number_input(
+                "편도 슬리피지 (%)", min_value=0.0, max_value=1.0, value=0.05, step=0.01
+            )
+
+        if st.button("강건 최적화 실행"):
+            opt_ticker = st.session_state.get("ticker", "")
+            opt_df = st.session_state.get("price_df", None)
+            if not opt_ticker or opt_df is None:
+                st.warning("먼저 기본 백테스트를 실행하세요.")
+            else:
+                from src.backtest.robust import (
+                    CostAssumptions,
+                    RobustScoringPolicy,
+                    WalkForwardConfig,
+                    run_walk_forward_optimization,
+                )
+                import uuid as _uuid
+
+                try:
+                    config = WalkForwardConfig(
+                        train_window_days=int(wf_train),
+                        test_window_days=int(wf_test),
+                        step_days=int(wf_step),
+                    )
+                except ValueError:
+                    st.error(
+                        "스텝(일)은 테스트 윈도우(일) 이상이어야 합니다. "
+                        "OOS 테스트 구간이 겹치지 않도록 값을 조정하세요."
+                    )
+                    config = None
+
+                if config is not None:
+                    with st.spinner("Walk-Forward 최적화 중..."):
+                        cost = CostAssumptions(
+                            fee_pct_one_way=fee_pct, slippage_pct_one_way=slippage_pct
+                        )
+                        opt_run = run_walk_forward_optimization(
+                            df=opt_df, ticker=opt_ticker, run_id=str(_uuid.uuid4())[:8],
+                            initial_balance=st.session_state.get("initial_balance", 10_000),
+                            config=config, cost=cost, policy=RobustScoringPolicy(),
+                            n_trials=wf_trials,
+                        )
+
+                    st.write(f"**상태:** `{opt_run.status}`")
+                    for w in opt_run.warnings:
+                        st.warning(w)
+
+                    _render_robust_optimization_result(opt_run)
+
     with tabs[4]:
         _render_report(result.get("final_report"), result.get("report_path"))
     with tabs[5]:
         _render_evaluator(result.get("evaluation_result"))
     with tabs[6]:
         _render_meta(result)
+
+
+def _render_robust_optimization_result(opt_run: Any) -> None:
+    """Render robust walk-forward optimization output blocks."""
+    if opt_run.robust_candidate:
+        c = opt_run.robust_candidate
+        if c.robust_label_allowed:
+            st.success("Robust 후보 선정됨")
+        else:
+            st.warning("후보 선정 (가드레일 조건 미충족 — 강한 해석 금지)")
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Robust Score", f"{c.score:.3f}")
+        oos_label = (
+            f"{c.metrics.median_oos_return_pct:.1f}%"
+            if c.metrics.median_oos_return_pct is not None
+            else "N/A"
+        )
+        col2.metric("OOS 수익률 중앙값", oos_label)
+        col3.metric("최대낙폭 (OOS)", f"{c.metrics.max_drawdown_pct:.1f}%")
+
+        with st.expander("스코어 구성요소"):
+            st.json(c.score_components)
+
+        with st.expander("폴드별 상세"):
+            for f in opt_run.folds:
+                st.write(
+                    f"Fold {f.fold_index}: {f.train_start}~{f.test_end} "
+                    f"| {f.status} | OOS 거래={f.candidate_metrics.completed_trades}"
+                )
+
+    if opt_run.regime_summary:
+        with st.expander("레짐별 성과"):
+            for r in opt_run.regime_summary:
+                conf_label = " (저신뢰도)" if r["confidence"] == "low" else ""
+                st.write(
+                    f"**{r['regime']}{conf_label}**: 거래 {r['completed_trades']}건 "
+                    f"| 수익률 {r['metrics'].get('cost_adjusted_return_pct', 0):.1f}%"
+                )
+                if r.get("low_confidence_reason"):
+                    st.caption(r["low_confidence_reason"])
+
+    if opt_run.manual_baseline or opt_run.passive_baseline:
+        with st.expander("기준선 비교"):
+            if opt_run.manual_baseline:
+                st.write(
+                    f"수동 파라미터: "
+                    f"{opt_run.manual_baseline.metrics.cost_adjusted_return_pct:.1f}%"
+                )
+            if opt_run.passive_baseline:
+                st.write(
+                    f"수동 매수보유: "
+                    f"{opt_run.passive_baseline.metrics.cost_adjusted_return_pct:.1f}%"
+                )
+
+    st.caption(
+        "이 결과는 과거 시뮬레이션 연구 참고용이며 투자 권유나 미래 수익 보장이 아닙니다."
+    )
 
 
 if __name__ == "__main__":

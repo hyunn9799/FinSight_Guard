@@ -250,6 +250,27 @@ def _backtest_section(state: GraphState) -> str:
     return f"{title}\n{body}"
 
 
+def _build_optimization_section(state: GraphState) -> str:
+    robust = state.get("robust_optimization")
+    if robust is None or robust.robust_score is None:
+        return ""
+    lines = [
+        "Walk-Forward 강건 최적화 참고 (과거 시뮬레이션)",
+        "",
+        f"- Robust Score: {robust.robust_score:.3f}",
+    ]
+    if robust.median_oos_return_pct is not None:
+        lines.append(f"- OOS 수익률 중앙값: {robust.median_oos_return_pct:.1f}%")
+    if robust.max_drawdown_pct is not None:
+        lines.append(f"- 최대낙폭 (OOS): {robust.max_drawdown_pct:.1f}%")
+    lines.append(f"- 유효 폴드 수: {robust.fold_count}")
+    lines.append("")
+    lines.append("※ 이 결과는 과거 시뮬레이션이며 매수·매도·보유 권유가 아닙니다.")
+    for w in robust.warnings:
+        lines.append(f"주의: {w}")
+    return "\n".join(lines)
+
+
 def _question_type(state: GraphState) -> str:
     plan = _supervisor_plan(state)
     if plan is None or plan.question_type is None:
@@ -456,7 +477,10 @@ def run_coordinator_agent(state: GraphState) -> dict:
         fundamental_section=_fundamental_section(state),
         news_section=_news_section(state),
         graph_context_section=graph_context_section,
-        backtest_section=_backtest_section(state),
+        backtest_section=_backtest_section(state) + (
+            "\n\n" + _build_optimization_section(state)
+            if _build_optimization_section(state) else ""
+        ),
         scenario_analysis=_scenario_analysis(ticker, state),
         risk_factors=_risk_factors(state),
         limitations=_limitations(state),
