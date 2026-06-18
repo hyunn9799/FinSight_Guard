@@ -495,10 +495,40 @@ def run_walk_forward_optimization(
         ],
     )
 
+    # Regime classification — post-hoc explanation only, NOT used in trial selection
+    from src.backtest.regime import compute_regime_performance, classify_regime_periods
+    regime_summary: list[dict] = []
+    try:
+        price_series = df["Close"]
+        regime_labels = classify_regime_periods(price_series)
+        oos_trade_frames: list[pd.DataFrame] = []
+        for fold in folds:
+            if fold.status == "valid":
+                test_mask2 = (df.index >= fold.test_start) & (df.index <= fold.test_end)
+                test_df2 = df.loc[test_mask2]
+                if len(test_df2) >= 2:
+                    from src.backtest.strategy import BacktestParams, run_backtest
+                    oos_res2 = run_backtest(
+                        test_df2, BacktestParams.from_dict(fold.selected_params),
+                        initial_balance, cost.total_one_way_fee
+                    )
+                    if oos_res2.trades is not None and not oos_res2.trades.empty:
+                        oos_trade_frames.append(oos_res2.trades)
+        all_oos_trades = (
+            pd.concat(oos_trade_frames, ignore_index=True)
+            if oos_trade_frames else pd.DataFrame()
+        )
+        regime_summary = compute_regime_performance(
+            all_oos_trades, regime_labels, initial_balance, cost
+        )
+    except Exception:
+        pass  # regime failure must not block main result
+
     return OptimizationRun(
         run_id=run_id, ticker=ticker, start=start_str, end=end_str,
         initial_balance=initial_balance, cost_assumptions=cost,
         scoring_policy=policy, fold_setup=config,
         status="success", folds=folds, robust_candidate=candidate,
+        regime_summary=regime_summary,
         warnings=["결과는 과거 시뮬레이션이며 매수·매도·보유 권유가 아닙니다."],
     )
