@@ -321,6 +321,45 @@ def compute_final_robust_score(
 # Walk-forward orchestration
 # ---------------------------------------------------------------------------
 
+def compute_baselines(
+    df: pd.DataFrame,
+    *,
+    start: str,
+    end: str,
+    initial_balance: float,
+    cost: CostAssumptions,
+    manual_params: Optional[dict],
+) -> tuple[BaselineResult, BaselineResult]:
+    """Return (manual_baseline, passive_baseline) over the same date window."""
+    from src.backtest.strategy import BacktestParams, run_backtest
+
+    mask = (df.index >= start) & (df.index <= end)
+    window_df = df.loc[mask]
+
+    if manual_params and not window_df.empty:
+        params = BacktestParams.from_dict(manual_params)
+        result = run_backtest(window_df, params, initial_balance, cost.total_one_way_fee)
+        m_metrics = compute_candidate_metrics(result, initial_balance, cost)
+    else:
+        m_metrics = CandidateMetrics()
+    manual = BaselineResult(baseline_type="manual_parameters", metrics=m_metrics)
+
+    if not window_df.empty and len(window_df) >= 2:
+        first_price = float(window_df["Close"].iloc[0])
+        last_price = float(window_df["Close"].iloc[-1])
+        effective_buy = first_price * (1 + cost.total_one_way_fee)
+        effective_sell = last_price * (1 - cost.total_one_way_fee)
+        pct = (effective_sell - effective_buy) / effective_buy * 100.0
+        p_metrics = CandidateMetrics(
+            total_return_pct=pct, cost_adjusted_return_pct=pct, completed_trades=1
+        )
+    else:
+        p_metrics = CandidateMetrics()
+    passive = BaselineResult(baseline_type="passive_buy_and_hold", metrics=p_metrics)
+
+    return manual, passive
+
+
 def _aggregate_fold_metrics(fold_oos_metrics: list[CandidateMetrics]) -> CandidateMetrics:
     if not fold_oos_metrics:
         return CandidateMetrics()
