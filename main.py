@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field, model_validator
 from src.config import REPORT_DIR
 from src.graph.workflow import run_research_workflow
 from src.observability.metrics import get_metrics
+from src.backtest.data_loader import load_price_history
 from src.storage.report_store import load_report_json
 from src.storage.run_store import get_run
 
@@ -220,6 +221,109 @@ def backtest(request: BacktestRequest) -> dict[str, Any]:
         "errors": result.get("errors", []),
     }
     return jsonable_encoder(response)
+
+
+# ── Walk-forward robust optimization ──────────────────────────────────────────
+
+class WalkForwardInput(BaseModel):
+    train_window_days: int = Field(default=360, gt=0)
+    test_window_days: int = Field(default=90, gt=0)
+    step_days: int = Field(default=90, gt=0)
+
+
+class CostInput(BaseModel):
+    fee_pct_one_way: float = Field(default=0.05, ge=0.0)
+    slippage_pct_one_way: float = Field(default=0.05, ge=0.0)
+
+
+class RobustOptimizeRequest(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    ticker: str = Field(min_length=1, max_length=20, pattern=TICKER_PATTERN)
+    investment_horizon: Literal["단기", "중기", "장기"]
+    risk_profile: Literal["보수형", "중립형", "공격형"]
+    start: str
+    end: str
+    initial_balance: float = Field(default=10_000.0, gt=0)
+    n_trials: int = Field(default=30, ge=1, le=50)
+    walk_forward: WalkForwardInput = Field(default_factory=WalkForwardInput)
+    costs: CostInput = Field(default_factory=CostInput)
+    manual_params: BacktestParamsInput | None = None
+
+    @model_validator(mode="after")
+    def validate_dates(self) -> "RobustOptimizeRequest":
+        try:
+            s = date.fromisoformat(self.start)
+            e = date.fromisoformat(self.end)
+        except ValueError as exc:
+            raise ValueError(f"Invalid date format: {exc}") from exc
+        if s >= e:
+            raise ValueError("start must be before end")
+        if (e - s).days > MAX_BACKTEST_LOOKBACK_DAYS:
+            raise ValueError(f"Date range exceeds {MAX_BACKTEST_LOOKBACK_DAYS} days")
+        return self
+
+
+@app.post("/backtest/optimize")
+async def post_robust_optimize(request: RobustOptimizeRequest) -> dict:
+    """Run robust walk-forward optimization (historical simulation research only)."""
+    import uuid as _uuid
+    from src.backtest.robust import (
+        CostAssumptions, RobustScoringPolicy, WalkForwardConfig,
+        run_walk_forward_optimization, compute_baselines,
+    )
+    from src.storage.report_store import save_optimization_run
+
+    run_id = str(_uuid.uuid4())[:8]
+
+    try:
+        df = load_price_history(request.ticker, request.start, request.end)
+    except Exception as exc:
+        return {"run_id": run_id, "status": "failed", "errors": [str(exc)], "optimization": None}
+
+    cost = CostAssumptions(
+        fee_pct_one_way=request.costs.fee_pct_one_way,
+        slippage_pct_one_way=request.costs.slippage_pct_one_way,
+    )
+    policy = RobustScoringPolicy()
+    config = WalkForwardConfig(
+        train_window_days=request.walk_forward.train_window_days,
+        test_window_days=request.walk_forward.test_window_days,
+        step_days=request.walk_forward.step_days,
+    )
+    manual_params = request.manual_params.model_dump() if request.manual_params else None
+
+    opt_run = run_walk_forward_optimization(
+        df=df, ticker=request.ticker, run_id=run_id,
+        initial_balance=request.initial_balance,
+        config=config, cost=cost, policy=policy,
+        n_trials=request.n_trials, manual_params=manual_params,
+    )
+
+    if opt_run.status == "success":
+        manual_b, passive_b = compute_baselines(
+            df=df, start=request.start, end=request.end,
+            initial_balance=request.initial_balance, cost=cost,
+            manual_params=manual_params,
+        )
+        opt_run.manual_baseline = manual_b
+        opt_run.passive_baseline = passive_b
+
+    report_path: str | None = None
+    if opt_run.status == "success":
+        try:
+            report_path = save_optimization_run(run_id, opt_run)
+            opt_run.report_path = report_path
+        except Exception:
+            pass
+
+    return {
+        "run_id": run_id,
+        "status": opt_run.status,
+        "optimization": opt_run.model_dump(mode="json"),
+        "report_path": report_path,
+        "errors": [],
+    }
 
 
 @app.get("/reports/{run_id}")
