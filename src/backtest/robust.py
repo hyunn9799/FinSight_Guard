@@ -48,6 +48,17 @@ class WalkForwardConfig(BaseModel):
     step_days: int = Field(gt=0)
     minimum_valid_test_folds: int = 3
 
+    @model_validator(mode="after")
+    def step_at_least_test_window(self) -> "WalkForwardConfig":
+        # Out-of-sample test windows must not overlap, otherwise aggregated fold
+        # metrics double-count the same trades and skew the robust score.
+        if self.step_days < self.test_window_days:
+            raise ValueError(
+                "step_days must be >= test_window_days to keep OOS test windows "
+                "non-overlapping."
+            )
+        return self
+
 
 class CandidateMetrics(BaseModel):
     total_return_pct: float = 0.0
@@ -293,11 +304,13 @@ def compute_final_robust_score(
     avg_sharpe = float(np.mean(sharpes))
     avg_mdd = float(np.mean(mdds))
 
-    c_oos = median_oos / 100.0
-    c_risk = avg_sharpe / 3.0
-    c_dd = max(0.0, 1.0 - avg_mdd / 100.0)
-    c_worst = max(0.0, (worst_fold + 20.0) / 40.0)
-    c_stab = max(0.0, 1.0 - stddev / 20.0)
+    # Clamp every component to [0, 1] so no single dimension (e.g. an extreme
+    # median return or Sharpe) can dominate the weighted final score.
+    c_oos = min(1.0, max(0.0, median_oos / 100.0))
+    c_risk = min(1.0, max(0.0, avg_sharpe / 3.0))
+    c_dd = min(1.0, max(0.0, 1.0 - avg_mdd / 100.0))
+    c_worst = min(1.0, max(0.0, (worst_fold + 20.0) / 40.0))
+    c_stab = min(1.0, max(0.0, 1.0 - stddev / 20.0))
 
     score = (
         policy.out_of_sample_return_weight * c_oos

@@ -83,6 +83,17 @@ def test_final_score_penalizes_high_stddev():
     assert score_stable > score_volatile
 
 
+def test_final_score_components_clamped_to_unit_interval():
+    # Extreme OOS return + Sharpe would push raw components above 1.0; ensure they
+    # are clamped so no single dimension dominates the weighted score.
+    extreme = [_metrics(cost_adjusted_return_pct=500.0, sharpe=12.0, max_drawdown_pct=0.0)] * 4
+    score, components = compute_final_robust_score(extreme, RobustScoringPolicy())
+    for value in components.values():
+        assert 0.0 <= value <= 1.0
+    # All components clamped to <=1.0 and weights sum to 1.0 → score cannot exceed 1.0
+    assert score <= 1.0 + 1e-9
+
+
 # --- robust_label_allowed ---
 
 def test_robust_label_allowed_when_guardrails_pass():

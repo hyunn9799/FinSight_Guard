@@ -4,6 +4,17 @@ import pandas as pd
 from src.backtest.robust import WalkForwardConfig, generate_fold_windows
 
 
+def test_config_rejects_step_smaller_than_test_window():
+    # step_days < test_window_days would overlap OOS windows and double-count trades.
+    with pytest.raises(ValueError, match="non-overlapping"):
+        WalkForwardConfig(train_window_days=180, test_window_days=90, step_days=60)
+
+
+def test_config_allows_step_equal_to_test_window():
+    cfg = WalkForwardConfig(train_window_days=180, test_window_days=60, step_days=60)
+    assert cfg.step_days == cfg.test_window_days
+
+
 def test_fold_windows_test_starts_after_train_end():
     config = WalkForwardConfig(train_window_days=180, test_window_days=60, step_days=60)
     folds = generate_fold_windows("2022-01-01", "2024-12-31", config)

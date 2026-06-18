@@ -60,6 +60,16 @@ def test_optimize_rejects_n_trials_above_50():
     assert resp.status_code == 422
 
 
+def test_optimize_rejects_overlapping_test_windows():
+    # step_days < test_window_days must be a clean 422, not a 500.
+    bad = {
+        **VALID_PAYLOAD,
+        "walk_forward": {"train_window_days": 180, "test_window_days": 90, "step_days": 60},
+    }
+    resp = client.post("/backtest/optimize", json=bad)
+    assert resp.status_code == 422
+
+
 def test_optimize_response_contains_warnings():
     with patch("main.load_price_history", return_value=_mock_df()):
         resp = client.post("/backtest/optimize", json=VALID_PAYLOAD)

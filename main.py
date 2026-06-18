@@ -230,6 +230,15 @@ class WalkForwardInput(BaseModel):
     test_window_days: int = Field(default=90, gt=0)
     step_days: int = Field(default=90, gt=0)
 
+    @model_validator(mode="after")
+    def step_at_least_test_window(self) -> "WalkForwardInput":
+        if self.step_days < self.test_window_days:
+            raise ValueError(
+                "step_days must be >= test_window_days to keep OOS test windows "
+                "non-overlapping."
+            )
+        return self
+
 
 class CostInput(BaseModel):
     fee_pct_one_way: float = Field(default=0.05, ge=0.0)
