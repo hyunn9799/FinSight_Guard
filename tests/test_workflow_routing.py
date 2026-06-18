@@ -239,6 +239,10 @@ def test_full_workflow_success_path_with_mocked_agents(monkeypatch, tmp_path) ->
         markdown_path.write_text(report.title, encoding="utf-8")
         return str(markdown_path)
 
+    def fake_persist_research_run(**kwargs) -> dict:
+        import uuid
+        return {"request_id": uuid.uuid4(), "report_id": uuid.uuid4(), "report_version_id": uuid.uuid4()}
+
     monkeypatch.setattr(project_logger, "LOG_DIR", tmp_path / "logs")
     monkeypatch.setattr(project_logger, "_CONFIGURED", False)
     monkeypatch.setattr(workflow, "run_market_agent", fake_market_agent)
@@ -246,6 +250,7 @@ def test_full_workflow_success_path_with_mocked_agents(monkeypatch, tmp_path) ->
     monkeypatch.setattr(workflow, "run_news_agent", fake_news_agent)
     monkeypatch.setattr(workflow, "run_graph_context_builder_node", fake_graph_context_builder_node)
     monkeypatch.setattr(workflow, "run_coordinator_agent", fake_coordinator_agent)
+    monkeypatch.setattr(workflow, "persist_research_run", fake_persist_research_run)
     monkeypatch.setattr(workflow, "save_report_json", fake_save_report_json)
     monkeypatch.setattr(workflow, "save_report_markdown", fake_save_report_markdown)
 

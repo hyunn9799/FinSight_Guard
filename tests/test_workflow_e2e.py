@@ -79,9 +79,14 @@ def _patch_storage(monkeypatch, tmp_path) -> None:
         path.write_text("{}", encoding="utf-8")
         return str(path)
 
+    def fake_persist_research_run(**kwargs) -> dict:
+        import uuid
+        return {"request_id": uuid.uuid4(), "report_id": uuid.uuid4(), "report_version_id": uuid.uuid4()}
+
     monkeypatch.setattr(workflow, "save_report_json", fake_save_report_json)
     monkeypatch.setattr(workflow, "save_report_markdown", fake_save_report_markdown)
     monkeypatch.setattr(workflow, "save_run", fake_save_run)
+    monkeypatch.setattr(workflow, "persist_research_run", fake_persist_research_run)
 
 
 def _patch_mock_agents(monkeypatch, calls: list[str] | None = None) -> None:
