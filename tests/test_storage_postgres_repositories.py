@@ -133,3 +133,40 @@ def test_add_evidence_from_pydantic_and_cite(db_session):
     version = reports.add_version(report.id, 1, "draft", {"k": "v"}, "md", created_by_node="coordinator_node")
     citation = ev_repo.add_citation(version.id, row.id, section_name="market", claim_text="close is 190.5")
     assert citation.id is not None
+
+
+@REQUIRES_DB
+def test_source_document_revision_and_chunks(db_session):
+    from datetime import UTC, datetime
+    from src.db.repositories.source_document_repository import SourceDocumentRepository
+
+    repo = SourceDocumentRepository(db_session)
+    doc = repo.add_document(
+        document_type="news", source_name="tavily", content_hash="h1",
+        collected_at=datetime.now(UTC), source_url="https://x/1",
+    )
+    corrected = repo.add_correction(doc, content_hash="h2", collected_at=datetime.now(UTC))
+    assert corrected.revision_group_id == doc.revision_group_id
+    assert corrected.supersedes_document_id == doc.id
+
+    repo.add_chunk(doc.id, 0, "first", "c0")
+    repo.add_chunk(doc.id, 1, "second", "c1")
+    chunks = repo.list_chunks(doc.id)
+    assert [c.chunk_index for c in chunks] == [0, 1]
+
+
+@REQUIRES_DB
+def test_duplicate_chunk_index_rejected(db_session):
+    import pytest as _pytest
+    from datetime import UTC, datetime
+    from sqlalchemy.exc import IntegrityError
+    from src.db.repositories.source_document_repository import SourceDocumentRepository
+
+    repo = SourceDocumentRepository(db_session)
+    doc = repo.add_document(
+        document_type="news", source_name="tavily", content_hash="h1",
+        collected_at=datetime.now(UTC),
+    )
+    repo.add_chunk(doc.id, 0, "a", "c0")
+    with _pytest.raises(IntegrityError):
+        repo.add_chunk(doc.id, 0, "b", "c0b")
