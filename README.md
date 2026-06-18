@@ -284,6 +284,16 @@ http://localhost:8501
 
 모든 백테스트 결과는 과거 시뮬레이션 참고 정보이며 매수·매도·보유 권유나 미래 수익 보장이 아닙니다.
 
+### Walk-Forward Robust Optimization
+
+- `POST /backtest/optimize` — time-ordered walk-forward evaluation; rejects total-return-only ranking
+- Candidate scoring: Sharpe, Sortino, MDD, win rate, profit factor, cost-adjusted return, turnover
+- Guardrails: minimum 30 completed trades AND MDD ≤ 25% for robust label
+- Regime performance summary: bull/bear/sideways/high-volatility/low-volatility (explanation only)
+- All results are historical simulations — not trading advice
+
+**Deferred** (separate future spec): PostgreSQL, Pinecone, Neo4j, OpenSearch, Redis, user accounts.
+
 ## FastAPI 실행
 
 ```bash
