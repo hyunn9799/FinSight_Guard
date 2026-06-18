@@ -23,3 +23,31 @@ def test_status_vocabularies_present():
     assert "draft" in constants.REPORT_STATUSES
     assert "pass" in constants.SAFETY_STATUSES
     assert "success" in constants.RESULT_STATUSES
+
+
+EXPECTED_TABLES = {
+    "users", "tickers", "analysis_requests", "workflow_node_runs",
+    "analysis_results", "reports", "report_versions", "evidence_items",
+    "report_evidence_citations", "source_documents", "document_chunks",
+    "structured_log_events",
+}
+
+
+def test_metadata_has_exactly_us1_tables():
+    from src.db.models import Base
+    assert set(Base.metadata.tables) == EXPECTED_TABLES
+
+
+def test_key_unique_constraints_declared():
+    from src.db.models import Base
+    tickers = Base.metadata.tables["tickers"]
+    uniques = {tuple(sorted(c.name for c in con.columns))
+               for con in tickers.constraints
+               if con.__class__.__name__ == "UniqueConstraint"}
+    assert ("market", "symbol") in uniques
+
+    versions = Base.metadata.tables["report_versions"]
+    v_uniques = {tuple(sorted(c.name for c in con.columns))
+                 for con in versions.constraints
+                 if con.__class__.__name__ == "UniqueConstraint"}
+    assert ("report_id", "version_number") in v_uniques
