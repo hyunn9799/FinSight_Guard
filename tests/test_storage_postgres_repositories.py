@@ -76,3 +76,30 @@ def test_node_run_unique_per_attempt(db_session):
     repo.record_node_run(req.id, "run-1", "market_node", "success", attempt_number=1)
     with _pytest.raises(IntegrityError):
         repo.record_node_run(req.id, "run-1", "market_node", "failed", attempt_number=1)
+
+
+@REQUIRES_DB
+def test_report_versions_and_current_version(db_session):
+    from src.db.repositories.analysis_repository import AnalysisRepository
+    from src.db.repositories.report_repository import ReportRepository
+
+    analysis = AnalysisRepository(db_session)
+    ticker = analysis.upsert_ticker("AAPL", "NASDAQ")
+    req = analysis.create_request(ticker.id, "research")
+
+    reports = ReportRepository(db_session)
+    report = reports.create_report(req.id, ticker.id, title="AAPL 리서치")
+    assert reports.next_version_number(report.id) == 1
+
+    v1 = reports.add_version(report.id, 1, "draft", {"a": 1}, "# md")
+    assert report.current_version_id == v1.id
+    assert reports.next_version_number(report.id) == 2
+
+    v2 = reports.add_version(report.id, 2, "final", {"a": 2}, "# md2", created_by_node="rewrite_node")
+    assert report.current_version_id == v2.id
+
+    reports.set_status(report.id, status="final", safety_status="pass",
+                       evaluation_score=0.9, disclaimer_present=True)
+    assert report.status == "final"
+    assert report.safety_status == "pass"
+    assert report.disclaimer_present is True
