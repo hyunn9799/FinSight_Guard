@@ -29,7 +29,7 @@ def synthetic_trades(n_sells: int = 35, initial_balance: float = 10_000.0, seed:
     rng = np.random.default_rng(seed)
     rows: list[dict] = []
     balance = initial_balance
-    dates = pd.bdate_range("2022-01-03", periods=n_sells * 2 + 10)
+    dates = pd.bdate_range("2022-01-03", periods=n_sells * 10 + 10)
     date_idx = 0
     for _ in range(n_sells):
         buy_price = float(rng.uniform(80, 120))
