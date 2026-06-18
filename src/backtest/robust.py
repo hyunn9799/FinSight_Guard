@@ -532,3 +532,83 @@ def run_walk_forward_optimization(
         regime_summary=regime_summary,
         warnings=["결과는 과거 시뮬레이션이며 매수·매도·보유 권유가 아닙니다."],
     )
+
+
+# ---------------------------------------------------------------------------
+# Safety text checks
+# ---------------------------------------------------------------------------
+
+FORBIDDEN_OPTIMIZATION_PHRASES: list[str] = [
+    "매수하세요", "매도하세요", "보유하세요",
+    "guaranteed return", "반드시 수익", "투자를 권유합니다",
+    "recommended trading", "자동 주문", "order execution",
+    "buy signal", "sell signal",
+]
+
+STRONG_POSITIVE_PHRASES: list[str] = [
+    "우수한 성과", "탁월한", "강력히 권장", "최고의 파라미터",
+    "확실한 수익", "이 파라미터로 투자",
+]
+
+
+def check_optimization_text_safety(text: str, *, robust_label_allowed: bool) -> bool:
+    """Return True if text passes optimization safety rules."""
+    lower = text.lower()
+    for phrase in FORBIDDEN_OPTIMIZATION_PHRASES:
+        if phrase.lower() in lower:
+            return False
+    if not robust_label_allowed:
+        for phrase in STRONG_POSITIVE_PHRASES:
+            if phrase.lower() in lower:
+                return False
+    return True
+
+
+# ---------------------------------------------------------------------------
+# Evidence set builder
+# ---------------------------------------------------------------------------
+
+def build_optimization_evidence_set(
+    run: "OptimizationRun",
+    ticker: str,
+) -> list:
+    """Build EvidenceItem records for all key numeric claims in an OptimizationRun."""
+    from src.evidence.evidence_builder import build_optimization_evidence
+
+    items = []
+    if run.robust_candidate is None:
+        return items
+
+    m = run.robust_candidate.metrics
+
+    def _add(metric_name: str, value: Optional[float], description: str) -> None:
+        if value is not None:
+            items.append(build_optimization_evidence(
+                ticker=ticker, metric_name=metric_name, metric_value=value,
+                description=description,
+            ))
+
+    _add("robust_score", run.robust_candidate.score,
+         "Final robust score (historical simulation, 5-component weighted).")
+    _add("cost_adjusted_return_pct", m.cost_adjusted_return_pct,
+         "Cost-adjusted OOS return — historical simulation only.")
+    _add("max_drawdown_pct", m.max_drawdown_pct,
+         "Maximum drawdown across OOS evaluation — historical simulation only.")
+    _add("completed_trades", float(m.completed_trades),
+         "Total completed OOS trades across all valid folds.")
+    _add("worst_fold_return_pct", m.worst_fold_return_pct,
+         "Worst single-fold OOS return — historical simulation.")
+    _add("median_oos_return_pct", m.median_oos_return_pct,
+         "Median OOS return across folds — historical simulation.")
+    _add("sharpe", m.sharpe, "OOS Sharpe ratio — historical simulation.")
+
+    if run.manual_baseline:
+        _add("manual_baseline_return_pct",
+             run.manual_baseline.metrics.cost_adjusted_return_pct,
+             "Manual parameter baseline return for comparison — historical simulation.")
+    if run.passive_baseline:
+        _add("passive_baseline_return_pct",
+             run.passive_baseline.metrics.cost_adjusted_return_pct,
+             "Passive buy-and-hold baseline return for comparison — historical simulation.")
+
+    return items
