@@ -51,7 +51,15 @@ def compute_regime_performance(
         return []
 
     sell_trades["date_ts"] = pd.to_datetime(sell_trades["date"])
+    if sell_trades["date_ts"].dt.tz is not None:
+        sell_trades["date_ts"] = sell_trades["date_ts"].dt.tz_localize(None)
     sell_trades = sell_trades.set_index("date_ts")
+
+    # Normalize regime labels to tz-naive so .isin() matches tz-naive trade dates.
+    # (yfinance price indexes are often tz-aware; trade dates are tz-naive.)
+    regime_labels = regime_labels.copy()
+    if isinstance(regime_labels.index, pd.DatetimeIndex) and regime_labels.index.tz is not None:
+        regime_labels.index = regime_labels.index.tz_localize(None)
 
     summaries: list[dict] = []
     for regime in ["bull", "bear", "sideways", "high_volatility", "low_volatility"]:

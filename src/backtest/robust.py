@@ -397,6 +397,17 @@ def run_walk_forward_optimization(
     from src.backtest.strategy import BacktestParams, run_backtest
 
     run_id = run_id or str(_uuid.uuid4())
+    if df.empty:
+        return OptimizationRun(
+            run_id=run_id, ticker=ticker, start="", end="",
+            initial_balance=initial_balance, cost_assumptions=cost,
+            scoring_policy=policy, fold_setup=config,
+            status="failed",
+            warnings=[
+                "Price history is empty; optimization could not run.",
+                "결과는 과거 시뮬레이션이며 매수·매도·보유 권유가 아닙니다.",
+            ],
+        )
     start_str = df.index[0].strftime("%Y-%m-%d")
     end_str = df.index[-1].strftime("%Y-%m-%d")
 
@@ -417,6 +428,7 @@ def run_walk_forward_optimization(
     folds: list[WalkForwardFold] = []
     fold_oos_metrics: list[CandidateMetrics] = []
     best_fold_params: dict = {}
+    fold_oos_trades: dict[int, pd.DataFrame] = {}
 
     for fw in fold_windows:
         train_mask = (df.index >= fw["train_start"]) & (df.index <= fw["train_end"])
@@ -448,6 +460,18 @@ def run_walk_forward_optimization(
             ))
             continue
 
+        if not best_params:
+            # All in-sample trials were pruned by the train filter; do NOT fall back
+            # to default params (that would violate walk-forward methodology).
+            folds.append(WalkForwardFold(
+                fold_index=fw["fold_index"],
+                train_start=fw["train_start"], train_end=fw["train_end"],
+                test_start=fw["test_start"], test_end=fw["test_end"],
+                selected_params={}, status="invalid",
+                warnings=["No parameter candidate passed the in-sample filter."],
+            ))
+            continue
+
         oos_result = run_backtest(
             test_df, BacktestParams.from_dict(best_params),
             initial_balance, cost.total_one_way_fee
@@ -465,6 +489,8 @@ def run_walk_forward_optimization(
         if fold_status == "valid":
             fold_oos_metrics.append(oos_metrics)
             best_fold_params = best_params
+            if oos_result.trades is not None and not oos_result.trades.empty:
+                fold_oos_trades[fw["fold_index"]] = oos_result.trades
 
     valid_count = len(fold_oos_metrics)
     if valid_count < config.minimum_valid_test_folds:
@@ -501,19 +527,9 @@ def run_walk_forward_optimization(
     try:
         price_series = df["Close"]
         regime_labels = classify_regime_periods(price_series)
-        oos_trade_frames: list[pd.DataFrame] = []
-        for fold in folds:
-            if fold.status == "valid":
-                test_mask2 = (df.index >= fold.test_start) & (df.index <= fold.test_end)
-                test_df2 = df.loc[test_mask2]
-                if len(test_df2) >= 2:
-                    from src.backtest.strategy import BacktestParams, run_backtest
-                    oos_res2 = run_backtest(
-                        test_df2, BacktestParams.from_dict(fold.selected_params),
-                        initial_balance, cost.total_one_way_fee
-                    )
-                    if oos_res2.trades is not None and not oos_res2.trades.empty:
-                        oos_trade_frames.append(oos_res2.trades)
+        # Reuse OOS trades collected during the main walk-forward loop instead of
+        # re-running run_backtest for every valid fold (same params → same result).
+        oos_trade_frames = [fold_oos_trades[idx] for idx in sorted(fold_oos_trades)]
         all_oos_trades = (
             pd.concat(oos_trade_frames, ignore_index=True)
             if oos_trade_frames else pd.DataFrame()

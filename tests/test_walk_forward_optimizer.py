@@ -80,9 +80,11 @@ def test_valid_run_produces_at_least_3_folds():
         initial_balance=10_000, config=_fast_config(),
         cost=CostAssumptions(), policy=RobustScoringPolicy(), n_trials=3,
     )
-    # synthetic data may yield no_trades with few optuna trials; count folds that ran
-    ran_folds = [f for f in result.folds if f.status in ("valid", "no_trades")]
-    assert len(ran_folds) >= 3
+    # The orchestration must process every generated fold window and append a
+    # WalkForwardFold for each. With weak synthetic data + few optuna trials the
+    # in-sample filter may prune all candidates (status "invalid"), so we assert
+    # on the number of folds processed rather than their data-dependent status.
+    assert len(result.folds) >= 3
 
 
 def test_fold_aggregate_includes_median_worst_stddev():
@@ -107,3 +109,39 @@ def test_warnings_list_non_empty_on_insufficient_data():
         cost=CostAssumptions(), policy=RobustScoringPolicy(), n_trials=2,
     )
     assert any("fold" in w.lower() for w in result.warnings)
+
+
+def test_empty_dataframe_fails_gracefully():
+    df = synthetic_prices(n=800).iloc[0:0]  # empty frame, keeps columns
+    result = run_walk_forward_optimization(
+        df=df, ticker="TEST", run_id="r5",
+        initial_balance=10_000, config=_fast_config(),
+        cost=CostAssumptions(), policy=RobustScoringPolicy(), n_trials=2,
+    )
+    assert result.status == "failed"
+    assert result.robust_candidate is None
+    assert any("empty" in w.lower() for w in result.warnings)
+
+
+def test_pruned_trials_do_not_fall_back_to_default_params():
+    """When robust_optimize_window returns no params, the fold is invalid,
+    not silently backtested with default parameters."""
+    import src.backtest.optimizer as optimizer_mod
+
+    df = synthetic_prices(n=800)
+    original = optimizer_mod.robust_optimize_window
+    optimizer_mod.robust_optimize_window = lambda *a, **k: ({}, None)
+    try:
+        result = run_walk_forward_optimization(
+            df=df, ticker="TEST", run_id="r6",
+            initial_balance=10_000, config=_fast_config(),
+            cost=CostAssumptions(), policy=RobustScoringPolicy(), n_trials=2,
+        )
+    finally:
+        optimizer_mod.robust_optimize_window = original
+
+    # All folds had no surviving in-sample candidate → none valid, no robust label
+    assert result.robust_candidate is None
+    assert all(f.status != "valid" for f in result.folds)
+    invalid = [f for f in result.folds if f.status == "invalid"]
+    assert invalid and any("in-sample filter" in w for f in invalid for w in f.warnings)
