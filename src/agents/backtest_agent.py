@@ -12,10 +12,17 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 from src.backtest.data_loader import load_price_history
+from src.backtest.robust import (
+    CostAssumptions,
+    RobustScoringPolicy,
+    WalkForwardConfig,
+    build_optimization_evidence_set,
+    run_walk_forward_optimization,
+)
 from src.backtest.strategy import BacktestParams, run_backtest
 from src.evidence.evidence_builder import build_backtest_evidence
 from src.evidence.evidence_schema import EvidenceItem
-from src.graph.state import BacktestAnalysis, GraphState, WorkflowError
+from src.graph.state import BacktestAnalysis, GraphState, RobustOptimizationAnalysis, WorkflowError
 
 
 BACKTEST_NODE = "backtest_agent"
@@ -105,6 +112,50 @@ def _build_evidence(ticker: str, result, start: str, end: str) -> list[EvidenceI
         )
         for metric_name, metric_value, description in metrics
     ]
+
+
+def run_robust_optimization_for_agent(
+    df,
+    ticker: str,
+    initial_balance: float = 10_000.0,
+    n_trials: int = 10,
+) -> RobustOptimizationAnalysis:
+    """Run walk-forward optimization and return RobustOptimizationAnalysis for workflow state."""
+    import uuid
+
+    run_id = str(uuid.uuid4())[:8]
+    config = WalkForwardConfig(train_window_days=180, test_window_days=60, step_days=60)
+    cost = CostAssumptions()
+    policy = RobustScoringPolicy()
+
+    opt_run = run_walk_forward_optimization(
+        df=df, ticker=ticker, run_id=run_id,
+        initial_balance=initial_balance, config=config, cost=cost,
+        policy=policy, n_trials=n_trials,
+    )
+    evidence = build_optimization_evidence_set(opt_run, ticker)
+
+    candidate = opt_run.robust_candidate
+    return RobustOptimizationAnalysis(
+        ticker=ticker,
+        summary=(
+            "과거 시뮬레이션 Walk-Forward 최적화 결과입니다. 매수·매도·보유 권유가 아닙니다."
+            if opt_run.status == "success"
+            else f"최적화 결과: {opt_run.status}"
+        ),
+        robust_score=candidate.score if candidate else None,
+        robust_label_allowed=candidate.robust_label_allowed if candidate else False,
+        score_components=candidate.score_components if candidate else {},
+        fold_count=len([f for f in opt_run.folds if f.status == "valid"]),
+        median_oos_return_pct=candidate.metrics.median_oos_return_pct if candidate else None,
+        worst_fold_return_pct=candidate.metrics.worst_fold_return_pct if candidate else None,
+        max_drawdown_pct=candidate.metrics.max_drawdown_pct if candidate else None,
+        completed_trades=candidate.metrics.completed_trades if candidate else 0,
+        regime_summary=opt_run.regime_summary,
+        warnings=opt_run.warnings,
+        evidence=evidence,
+        optimization_run_id=opt_run.run_id,
+    )
 
 
 def run_backtest_agent(state: GraphState) -> dict:
