@@ -335,3 +335,12 @@ def run_rewrite_agent(state: GraphState) -> dict:
         "draft_report": revised_report,
         "rewrite_attempts": rewrite_attempts,
     }
+
+
+def _check_evidence_ids_preserved(original: str, rewritten: str) -> bool:
+    """Evidence IDs in rewritten text must match original — numbers must not change."""
+    orig_ids = set(re.findall(r"opt_[a-f0-9]{8,}", original))
+    new_ids = set(re.findall(r"opt_[a-f0-9]{8,}", rewritten))
+    orig_nums = set(re.findall(r"\d+\.?\d+%", original))
+    new_nums = set(re.findall(r"\d+\.?\d+%", rewritten))
+    return orig_ids == new_ids and orig_nums == new_nums
