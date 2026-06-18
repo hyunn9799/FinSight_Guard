@@ -21,6 +21,7 @@ env/
 # Runtime outputs
 logs/
 reports/
+neowave_dataset/
 
 # OS and editor files
 .DS_Store
