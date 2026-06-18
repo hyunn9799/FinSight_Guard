@@ -162,3 +162,24 @@ def test_get_report_endpoint_returns_404_for_unknown_run(monkeypatch, tmp_path) 
 
     assert exc_info.value.status_code == 404
     assert exc_info.value.detail == "Report not found."
+
+
+def test_analyze_response_includes_request_id(monkeypatch) -> None:
+    from fastapi.testclient import TestClient
+
+    def _fake_run(ticker, user_query=None, **kwargs):
+        return {
+            "run_id": "run-1",
+            "status": "success",
+            "ticker": ticker,
+            "request_id": "11111111-1111-1111-1111-111111111111",
+            "final_report": None,
+        }
+
+    monkeypatch.setattr(main, "run_research_workflow", _fake_run, raising=False)
+    client = TestClient(main.app)
+    resp = client.post("/analyze", json={"ticker": "AAPL", "investment_horizon": "장기", "risk_profile": "중립형"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["run_id"] == "run-1"
+    assert body["request_id"] == "11111111-1111-1111-1111-111111111111"
