@@ -222,6 +222,40 @@ def compute_candidate_metrics(
 # Scoring & guardrails
 # ---------------------------------------------------------------------------
 
+def generate_fold_windows(
+    start: str,
+    end: str,
+    config: WalkForwardConfig,
+) -> list[dict]:
+    """Generate time-ordered walk-forward fold windows. No train/test overlap."""
+    start_dt = pd.Timestamp(start)
+    end_dt = pd.Timestamp(end)
+    folds = []
+    fold_index = 1
+    cursor = start_dt
+
+    while True:
+        train_start = cursor
+        train_end = train_start + pd.Timedelta(days=config.train_window_days - 1)
+        test_start = train_end + pd.Timedelta(days=1)
+        test_end = test_start + pd.Timedelta(days=config.test_window_days - 1)
+
+        if test_end > end_dt:
+            break
+
+        folds.append({
+            "fold_index": fold_index,
+            "train_start": train_start.strftime("%Y-%m-%d"),
+            "train_end": train_end.strftime("%Y-%m-%d"),
+            "test_start": test_start.strftime("%Y-%m-%d"),
+            "test_end": test_end.strftime("%Y-%m-%d"),
+        })
+        fold_index += 1
+        cursor = cursor + pd.Timedelta(days=config.step_days)
+
+    return folds
+
+
 def passes_train_trial_filter(metrics: CandidateMetrics) -> bool:
     """In-training filter: reject obviously bad candidates before OOS evaluation."""
     return metrics.completed_trades >= 30 and metrics.max_drawdown_pct <= 25.0
