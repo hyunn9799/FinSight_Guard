@@ -1,4 +1,11 @@
 import importlib
+import os
+import pytest
+from sqlalchemy import create_engine, inspect
+
+REQUIRES_DB = pytest.mark.skipif(
+    not os.getenv("TEST_DATABASE_URL"), reason="TEST_DATABASE_URL not set"
+)
 
 
 def test_config_exposes_database_url(monkeypatch):
@@ -51,3 +58,11 @@ def test_key_unique_constraints_declared():
                  for con in versions.constraints
                  if con.__class__.__name__ == "UniqueConstraint"}
     assert ("report_id", "version_number") in v_uniques
+
+
+@REQUIRES_DB
+def test_alembic_upgrade_creates_all_tables(alembic_migrated_db):
+    engine = create_engine(os.environ["TEST_DATABASE_URL"], future=True)
+    table_names = set(inspect(engine).get_table_names())
+    assert EXPECTED_TABLES.issubset(table_names)
+    engine.dispose()
