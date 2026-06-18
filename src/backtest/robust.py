@@ -216,3 +216,68 @@ def compute_candidate_metrics(
         average_holding_days=avg_holding,
         turnover=turnover,
     )
+
+
+# ---------------------------------------------------------------------------
+# Scoring & guardrails
+# ---------------------------------------------------------------------------
+
+def passes_train_trial_filter(metrics: CandidateMetrics) -> bool:
+    """In-training filter: reject obviously bad candidates before OOS evaluation."""
+    return metrics.completed_trades >= 30 and metrics.max_drawdown_pct <= 25.0
+
+
+def compute_train_trial_score(metrics: CandidateMetrics) -> float:
+    """In-sample trial score for Optuna ranking: Sharpe(35%) + Sortino(35%) + -MDD(20%) + -turnover(10%)."""
+    sharpe = metrics.sharpe or 0.0
+    sortino = metrics.sortino or 0.0
+    mdd = metrics.max_drawdown_pct
+    turnover = metrics.turnover or 0.0
+    return 0.35 * sharpe + 0.35 * sortino + 0.20 * (-mdd / 25.0) + 0.10 * (-min(turnover, 10.0) / 10.0)
+
+
+def compute_robust_label_allowed(metrics: CandidateMetrics) -> bool:
+    """OOS guardrail: both conditions must hold for robust label."""
+    return metrics.completed_trades >= 30 and metrics.max_drawdown_pct <= 25.0
+
+
+def compute_final_robust_score(
+    fold_metrics: list[CandidateMetrics],
+    policy: RobustScoringPolicy,
+) -> tuple[float, dict]:
+    """Compute the 5-component final robust score from OOS fold metrics."""
+    if not fold_metrics:
+        return 0.0, {}
+
+    oos_returns = [m.cost_adjusted_return_pct for m in fold_metrics]
+    sharpes = [m.sharpe or 0.0 for m in fold_metrics]
+    mdds = [m.max_drawdown_pct for m in fold_metrics]
+
+    median_oos = float(np.median(oos_returns))
+    worst_fold = float(min(oos_returns))
+    stddev = float(np.std(oos_returns)) if len(oos_returns) > 1 else 0.0
+    avg_sharpe = float(np.mean(sharpes))
+    avg_mdd = float(np.mean(mdds))
+
+    c_oos = median_oos / 100.0
+    c_risk = avg_sharpe / 3.0
+    c_dd = max(0.0, 1.0 - avg_mdd / 100.0)
+    c_worst = max(0.0, (worst_fold + 20.0) / 40.0)
+    c_stab = max(0.0, 1.0 - stddev / 20.0)
+
+    score = (
+        policy.out_of_sample_return_weight * c_oos
+        + policy.risk_adjusted_return_weight * c_risk
+        + policy.drawdown_control_weight * c_dd
+        + policy.worst_fold_resilience_weight * c_worst
+        + policy.stability_turnover_penalty_weight * c_stab
+    )
+
+    components = {
+        "out_of_sample_return": round(c_oos, 4),
+        "risk_adjusted_return": round(c_risk, 4),
+        "drawdown_control": round(c_dd, 4),
+        "worst_fold_resilience": round(c_worst, 4),
+        "stability_turnover_penalty": round(c_stab, 4),
+    }
+    return float(score), components
