@@ -99,6 +99,7 @@ class AnalysisRepository(BaseRepository):
             node_metadata=metadata or {},
         )
         self.session.add(node)
+        self.session.flush()
         return node
 
     def add_result(

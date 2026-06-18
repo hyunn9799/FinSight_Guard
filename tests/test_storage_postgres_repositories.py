@@ -74,6 +74,5 @@ def test_node_run_unique_per_attempt(db_session):
     t = repo.upsert_ticker("MSFT", "NASDAQ")
     req = repo.create_request(t.id, "research")
     repo.record_node_run(req.id, "run-1", "market_node", "success", attempt_number=1)
-    repo.record_node_run(req.id, "run-1", "market_node", "failed", attempt_number=1)
     with _pytest.raises(IntegrityError):
-        db_session.flush()
+        repo.record_node_run(req.id, "run-1", "market_node", "failed", attempt_number=1)
