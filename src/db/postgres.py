@@ -16,13 +16,13 @@ def get_engine() -> Engine:
     return create_engine(DATABASE_URL, future=True, pool_pre_ping=True)
 
 
-SessionLocal = sessionmaker(bind=get_engine(), class_=Session, expire_on_commit=False, future=True)
+SessionLocal = sessionmaker(class_=Session, expire_on_commit=False, future=True)
 
 
 @contextmanager
 def session_scope() -> Iterator[Session]:
     """Provide a transactional session: commit on success, rollback on error."""
-    session = SessionLocal()
+    session = SessionLocal(bind=get_engine())
     try:
         yield session
         session.commit()
