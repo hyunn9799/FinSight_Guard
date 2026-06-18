@@ -452,6 +452,24 @@ failed_runs
 average_evaluation_score
 ```
 
+## Storage architecture (PostgreSQL source of truth)
+
+PostgreSQL is the canonical store for research workflow records (requests, node runs,
+results, reports, report versions, evidence, citations, source documents, chunks, log
+events). The previous local JSON/Markdown files are kept as export artifacts only.
+
+**Local setup**
+
+    docker compose up -d db
+    export DATABASE_URL=postgresql+psycopg://finsight:finsight@localhost:5432/finsight
+    export TEST_DATABASE_URL=postgresql+psycopg://finsight:finsight@localhost:5432/finsight_test
+    .venv/bin/alembic upgrade head
+
+**Important:** before running the app, migrate the runtime database that `DATABASE_URL` points at (`alembic upgrade head` with `DATABASE_URL` set), not just the test DB. If the runtime DB is unmigrated, every `/analyze` run degrades (no PostgreSQL records are written; JSON/Markdown export files are still produced).
+
+**Tests** require a running PostgreSQL and `TEST_DATABASE_URL`. When `TEST_DATABASE_URL`
+is unset, the PostgreSQL storage tests skip (they never silently pass).
+
 ## 한계
 
 - 이 프로젝트는 MVP/포트폴리오 목적의 연구 보조 시스템이며 production 금융 플랫폼이 아닙니다.

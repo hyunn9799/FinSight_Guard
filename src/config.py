@@ -11,3 +11,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 LLM_MODEL = os.getenv("LLM_MODEL", "gpt-4o-mini")
 ENABLE_LLM_SUPERVISOR = os.getenv("ENABLE_LLM_SUPERVISOR", "false").strip().lower() == "true"
 LLM_SUPERVISOR_MODEL = os.getenv("LLM_SUPERVISOR_MODEL", LLM_MODEL)
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql+psycopg://finsight:finsight@localhost:5432/finsight",
+)

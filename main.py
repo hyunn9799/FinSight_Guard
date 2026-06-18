@@ -44,6 +44,7 @@ class AnalyzeResponse(BaseModel):
     evaluation_result: Any = None
     report_path: str | None = None
     errors: list[Any] = Field(default_factory=list)
+    request_id: str | None = None
 
 
 class BacktestParamsInput(BaseModel):
@@ -182,6 +183,7 @@ def analyze(request: AnalyzeRequest) -> dict[str, Any]:
         "evaluation_result": result.get("evaluation_result"),
         "report_path": result.get("report_path"),
         "errors": result.get("errors", []),
+        "request_id": (str(result["request_id"]) if result.get("request_id") else None),
     }
     return jsonable_encoder(response)
 

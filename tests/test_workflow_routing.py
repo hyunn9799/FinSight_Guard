@@ -106,6 +106,34 @@ def test_completed_supervisor_plan_routes_to_graph_context_node() -> None:
     assert route_after_supervisor(state) == "graph_context_node"
 
 
+def test_run_research_workflow_returns_persisted_ids(monkeypatch) -> None:
+    import uuid
+    import src.graph.workflow as workflow
+
+    request_id = uuid.uuid4()
+    report_id = uuid.uuid4()
+    version_id = uuid.uuid4()
+
+    class FakeGraph:
+        def invoke(self, state):
+            return {
+                **state,
+                "status": "success",
+                "request_id": request_id,
+                "report_id": report_id,
+                "report_version_id": version_id,
+                "report_path": "reports/run.json",
+            }
+
+    monkeypatch.setattr(workflow, "build_research_graph", lambda: FakeGraph())
+
+    result = run_research_workflow("AAPL", "장기", "중립형")
+
+    assert result["request_id"] == request_id
+    assert result["report_id"] == report_id
+    assert result["report_version_id"] == version_id
+
+
 def test_rewrite_agent_removes_unsafe_language_and_adds_required_sections() -> None:
     state = {
         "draft_report": _unsafe_report(),
@@ -239,6 +267,10 @@ def test_full_workflow_success_path_with_mocked_agents(monkeypatch, tmp_path) ->
         markdown_path.write_text(report.title, encoding="utf-8")
         return str(markdown_path)
 
+    def fake_persist_research_run(**kwargs) -> dict:
+        import uuid
+        return {"request_id": uuid.uuid4(), "report_id": uuid.uuid4(), "report_version_id": uuid.uuid4()}
+
     monkeypatch.setattr(project_logger, "LOG_DIR", tmp_path / "logs")
     monkeypatch.setattr(project_logger, "_CONFIGURED", False)
     monkeypatch.setattr(workflow, "run_market_agent", fake_market_agent)
@@ -246,6 +278,7 @@ def test_full_workflow_success_path_with_mocked_agents(monkeypatch, tmp_path) ->
     monkeypatch.setattr(workflow, "run_news_agent", fake_news_agent)
     monkeypatch.setattr(workflow, "run_graph_context_builder_node", fake_graph_context_builder_node)
     monkeypatch.setattr(workflow, "run_coordinator_agent", fake_coordinator_agent)
+    monkeypatch.setattr(workflow, "persist_research_run", fake_persist_research_run)
     monkeypatch.setattr(workflow, "save_report_json", fake_save_report_json)
     monkeypatch.setattr(workflow, "save_report_markdown", fake_save_report_markdown)
 
@@ -287,3 +320,37 @@ def test_rewrite_does_not_change_evidence_ids():
     rewritten = text.replace("기록되었습니다", "나타났습니다")
     evidence_ids_after = set(re.findall(r"opt_[a-f0-9]+", rewritten))
     assert evidence_ids_before == evidence_ids_after
+
+
+def test_research_workflow_state_propagates_persisted_ids() -> None:
+    """Regression: persisted IDs returned by a node must survive the graph's
+    channel filtering. ResearchWorkflowState MUST declare request_id/report_id/
+    report_version_id, otherwise LangGraph drops them and run_research_workflow
+    (and the /analyze response) always see None. This exercises the REAL graph
+    schema (not a mocked build_research_graph)."""
+    import uuid
+
+    from langgraph.graph import END, START, StateGraph
+
+    from src.graph.workflow import ResearchWorkflowState
+
+    request_id = uuid.uuid4()
+    report_id = uuid.uuid4()
+    version_id = uuid.uuid4()
+
+    def stub_save(state):
+        return {
+            "request_id": request_id,
+            "report_id": report_id,
+            "report_version_id": version_id,
+        }
+
+    graph = StateGraph(ResearchWorkflowState)
+    graph.add_node("save", stub_save)
+    graph.add_edge(START, "save")
+    graph.add_edge("save", END)
+    final_state = graph.compile().invoke({"ticker": "AAPL"})
+
+    assert final_state.get("request_id") == request_id
+    assert final_state.get("report_id") == report_id
+    assert final_state.get("report_version_id") == version_id
