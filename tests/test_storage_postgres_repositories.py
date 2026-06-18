@@ -103,3 +103,33 @@ def test_report_versions_and_current_version(db_session):
     assert report.status == "final"
     assert report.safety_status == "pass"
     assert report.disclaimer_present is True
+
+
+@REQUIRES_DB
+def test_add_evidence_from_pydantic_and_cite(db_session):
+    from datetime import UTC, datetime
+    from src.evidence.evidence_schema import EvidenceItem
+    from src.db.repositories.analysis_repository import AnalysisRepository
+    from src.db.repositories.evidence_repository import EvidenceRepository
+    from src.db.repositories.report_repository import ReportRepository
+
+    analysis = AnalysisRepository(db_session)
+    ticker = analysis.upsert_ticker("AAPL", "NASDAQ")
+    req = analysis.create_request(ticker.id, "research")
+
+    item = EvidenceItem(
+        evidence_id="ev-1", source_type="market", source_name="yfinance",
+        collected_at=datetime.now(UTC), ticker="AAPL", metric_name="close",
+        metric_value=190.5, description="closing price",
+    )
+    ev_repo = EvidenceRepository(db_session)
+    row = ev_repo.add_evidence(item, request_id=req.id, ticker_id=ticker.id)
+    assert row.evidence_id == "ev-1"
+    assert row.metric_value == {"value": 190.5}
+    assert [r.evidence_id for r in ev_repo.list_for_request(req.id)] == ["ev-1"]
+
+    reports = ReportRepository(db_session)
+    report = reports.create_report(req.id, ticker.id, title="t")
+    version = reports.add_version(report.id, 1, "draft", {"k": "v"}, "md", created_by_node="coordinator_node")
+    citation = ev_repo.add_citation(version.id, row.id, section_name="market", claim_text="close is 190.5")
+    assert citation.id is not None
