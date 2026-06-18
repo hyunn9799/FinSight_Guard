@@ -1,4 +1,6 @@
 import os
+from datetime import UTC, datetime
+
 import pytest
 
 REQUIRES_DB = pytest.mark.skipif(
@@ -27,3 +29,51 @@ def test_base_repository_get(db_session):
     assert repo.get(Ticker, ticker.id).symbol == "AAPL"
     import uuid
     assert repo.get(Ticker, uuid.uuid4()) is None
+
+
+@REQUIRES_DB
+def test_upsert_ticker_is_idempotent_and_uppercases(db_session):
+    from src.db.repositories.analysis_repository import AnalysisRepository
+    repo = AnalysisRepository(db_session)
+    a = repo.upsert_ticker("aapl", "NASDAQ")
+    b = repo.upsert_ticker("AAPL", "NASDAQ")
+    assert a.id == b.id
+    assert a.symbol == "AAPL"
+
+
+@REQUIRES_DB
+def test_request_node_run_result_lifecycle(db_session):
+    from src.db.repositories.analysis_repository import AnalysisRepository
+    repo = AnalysisRepository(db_session)
+    ticker = repo.upsert_ticker("AAPL", "NASDAQ")
+    req = repo.create_request(ticker.id, "research", parameters={"q": "x"})
+    assert req.status == "pending"
+
+    node = repo.record_node_run(req.id, "run-1", "market_node", "success", duration_ms=12)
+    assert node.attempt_number == 1
+
+    result = repo.add_result(
+        req.id, "market", ticker_id=ticker.id, summary="s",
+        missing_data_notes=["news unavailable"], status="degraded",
+    )
+    assert result.missing_data_notes == ["news unavailable"]
+
+    updated = repo.update_request_status(
+        req.id, "degraded", degraded_reason="news down", completed_at=datetime.now(UTC)
+    )
+    assert updated.status == "degraded"
+    assert updated.completed_at is not None
+
+
+@REQUIRES_DB
+def test_node_run_unique_per_attempt(db_session):
+    import pytest as _pytest
+    from sqlalchemy.exc import IntegrityError
+    from src.db.repositories.analysis_repository import AnalysisRepository
+    repo = AnalysisRepository(db_session)
+    t = repo.upsert_ticker("MSFT", "NASDAQ")
+    req = repo.create_request(t.id, "research")
+    repo.record_node_run(req.id, "run-1", "market_node", "success", attempt_number=1)
+    repo.record_node_run(req.id, "run-1", "market_node", "failed", attempt_number=1)
+    with _pytest.raises(IntegrityError):
+        db_session.flush()
