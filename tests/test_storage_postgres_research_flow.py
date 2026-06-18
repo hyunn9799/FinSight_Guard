@@ -89,3 +89,53 @@ def test_persist_degraded_run_keeps_missing_notes(db_session, monkeypatch):
     assert "news provider unavailable" in (req.degraded_reason or "")
     report = db_session.get(Report, out["report_id"])
     assert report.status == "draft"
+
+
+@REQUIRES_DB
+def test_save_report_node_persists_then_exports(db_session, monkeypatch, tmp_path):
+    import src.db.persistence as persistence
+    import src.graph.workflow as workflow
+    from contextlib import contextmanager
+
+    @contextmanager
+    def _scope():
+        yield db_session
+
+    monkeypatch.setattr(persistence, "session_scope", _scope)
+    monkeypatch.setattr(workflow, "save_report_json", lambda run_id, payload: str(tmp_path / "r.json"))
+    monkeypatch.setattr(workflow, "save_report_markdown", lambda run_id, report: str(tmp_path / "r.md"))
+    monkeypatch.setattr(workflow, "save_run", lambda run_id, meta: meta)
+
+    from src.graph.state import EvaluationResult
+    evaluation = EvaluationResult(
+        overall_pass=True, source_grounding_score=1.0, numeric_consistency_score=1.0,
+        safety_score=1.0, risk_disclosure_score=1.0, freshness_score=1.0,
+    )
+    state = {
+        "run_id": "run-x", "ticker": "AAPL", "status": "success",
+        "draft_report": _sample_report(), "evidence": _sample_evidence(),
+        "evaluation_result": evaluation,
+    }
+    out = workflow.save_report_node(state)
+    assert out["status"] == "success"
+    assert out["request_id"]  # set from persistence
+    from src.db.models import AnalysisRequest
+    assert db_session.get(AnalysisRequest, out["request_id"]) is not None
+
+
+@REQUIRES_DB
+def test_save_report_node_degrades_on_persistence_error(monkeypatch, tmp_path):
+    import src.graph.workflow as workflow
+
+    def _boom(**kwargs):
+        raise RuntimeError("db down")
+
+    monkeypatch.setattr(workflow, "persist_research_run", _boom)
+    monkeypatch.setattr(workflow, "save_report_json", lambda *a: str(tmp_path / "r.json"))
+    monkeypatch.setattr(workflow, "save_report_markdown", lambda *a: str(tmp_path / "r.md"))
+    monkeypatch.setattr(workflow, "save_run", lambda *a: {})
+
+    state = {"run_id": "run-y", "ticker": "AAPL", "status": "success", "draft_report": _sample_report()}
+    out = workflow.save_report_node(state)
+    assert out["status"] == "degraded"
+    assert any(getattr(e, "error_type", "") == "persistence_error" for e in out["errors"])

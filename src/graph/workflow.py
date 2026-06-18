@@ -24,6 +24,7 @@ from src.graph.state import AgentName, GraphState, ResearchReport, UserInput, Wo
 from src.graph_rag.graph_context_builder import build_graph_context
 from src.observability.logger import log_node_error, log_node_start, log_node_success
 from src.observability.metrics import record_run
+from src.db.persistence import persist_research_run
 from src.storage.report_store import save_report_json, save_report_markdown
 from src.storage.run_store import save_run
 
@@ -351,6 +352,35 @@ def save_report_node(state: ResearchWorkflowState) -> dict:
 
     evaluation = state.get("evaluation_result")
     final_status = "success" if evaluation is not None and evaluation.overall_pass else "failed"
+
+    persisted: dict = {}
+    try:
+        persisted = persist_research_run(
+            run_id=run_id,
+            ticker=state.get("ticker", ""),
+            status=final_status,
+            report=report,
+            evidence=state.get("evidence", []),
+            evaluation=evaluation,
+            missing_data_notes=state.get("missing_data_notes", []),
+        )
+    except Exception as exc:  # persistence is required; degrade deterministically
+        error = _workflow_error(
+            node="save_report_node",
+            message=f"Failed to persist research run to PostgreSQL: {exc}",
+            error_type="persistence_error",
+            recoverable=True,
+        )
+        log_node_error(run_id, "save_report_node", error.message)
+        record_run(False, _evaluation_score(state))
+        log_node_success(run_id, "save_report_node", (perf_counter() - start) * 1000)
+        return {
+            "run_id": run_id,
+            "status": "degraded",
+            "errors": [*state.get("errors", []), error],
+            "completed_at": datetime.now(UTC),
+        }
+
     payload = _report_payload(report, {**state, "status": final_status, "run_id": run_id})
     report_path = save_report_json(run_id, payload)
     markdown_path = save_report_markdown(run_id, report)
@@ -365,6 +395,7 @@ def save_report_node(state: ResearchWorkflowState) -> dict:
             "evaluation_score": evaluation_score,
             "report_path": report_path,
             "markdown_path": markdown_path,
+            "request_id": str(persisted.get("request_id")) if persisted.get("request_id") else None,
         },
     )
     log_node_success(run_id, "save_report_node", (perf_counter() - start) * 1000)
@@ -374,6 +405,8 @@ def save_report_node(state: ResearchWorkflowState) -> dict:
         "status": final_status,
         "final_report": report,
         "report_path": report_path,
+        "request_id": persisted.get("request_id"),
+        "report_id": persisted.get("report_id"),
         "completed_at": datetime.now(UTC),
     }
 
