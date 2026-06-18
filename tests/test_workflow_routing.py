@@ -320,3 +320,37 @@ def test_rewrite_does_not_change_evidence_ids():
     rewritten = text.replace("기록되었습니다", "나타났습니다")
     evidence_ids_after = set(re.findall(r"opt_[a-f0-9]+", rewritten))
     assert evidence_ids_before == evidence_ids_after
+
+
+def test_research_workflow_state_propagates_persisted_ids() -> None:
+    """Regression: persisted IDs returned by a node must survive the graph's
+    channel filtering. ResearchWorkflowState MUST declare request_id/report_id/
+    report_version_id, otherwise LangGraph drops them and run_research_workflow
+    (and the /analyze response) always see None. This exercises the REAL graph
+    schema (not a mocked build_research_graph)."""
+    import uuid
+
+    from langgraph.graph import END, START, StateGraph
+
+    from src.graph.workflow import ResearchWorkflowState
+
+    request_id = uuid.uuid4()
+    report_id = uuid.uuid4()
+    version_id = uuid.uuid4()
+
+    def stub_save(state):
+        return {
+            "request_id": request_id,
+            "report_id": report_id,
+            "report_version_id": version_id,
+        }
+
+    graph = StateGraph(ResearchWorkflowState)
+    graph.add_node("save", stub_save)
+    graph.add_edge(START, "save")
+    graph.add_edge("save", END)
+    final_state = graph.compile().invoke({"ticker": "AAPL"})
+
+    assert final_state.get("request_id") == request_id
+    assert final_state.get("report_id") == report_id
+    assert final_state.get("report_version_id") == version_id

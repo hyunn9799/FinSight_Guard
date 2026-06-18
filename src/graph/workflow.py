@@ -3,7 +3,7 @@
 from datetime import UTC, datetime
 from time import perf_counter
 from typing import TypedDict
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from langgraph.graph import END, START, StateGraph
 
@@ -47,6 +47,12 @@ class ResearchWorkflowState(GraphState, total=False):
     investment_horizon: str
     risk_profile: str
     report_path: str
+    # Persisted PostgreSQL identifiers emitted by save_report_node. These MUST be
+    # declared as channels or LangGraph drops them, so run_research_workflow / the
+    # /analyze response would always see None.
+    request_id: UUID
+    report_id: UUID
+    report_version_id: UUID
 
 
 def _workflow_error(
