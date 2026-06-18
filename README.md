@@ -465,6 +465,8 @@ events). The previous local JSON/Markdown files are kept as export artifacts onl
     export TEST_DATABASE_URL=postgresql+psycopg://finsight:finsight@localhost:5432/finsight_test
     .venv/bin/alembic upgrade head
 
+**Important:** before running the app, migrate the runtime database that `DATABASE_URL` points at (`alembic upgrade head` with `DATABASE_URL` set), not just the test DB. If the runtime DB is unmigrated, every `/analyze` run degrades (no PostgreSQL records are written; JSON/Markdown export files are still produced).
+
 **Tests** require a running PostgreSQL and `TEST_DATABASE_URL`. When `TEST_DATABASE_URL`
 is unset, the PostgreSQL storage tests skip (they never silently pass).
 

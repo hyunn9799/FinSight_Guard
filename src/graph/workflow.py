@@ -373,10 +373,26 @@ def save_report_node(state: ResearchWorkflowState) -> dict:
         )
         log_node_error(run_id, "save_report_node", error.message)
         record_run(False, _evaluation_score(state))
+        # Export files must always be written even when PG persistence fails.
+        payload = _report_payload(report, {**state, "status": "degraded", "run_id": run_id})
+        report_path = save_report_json(run_id, payload)
+        markdown_path = save_report_markdown(run_id, report)
+        save_run(
+            run_id,
+            {
+                "ticker": state.get("ticker"),
+                "status": "degraded",
+                "report_path": report_path,
+                "markdown_path": markdown_path,
+                "request_id": None,
+            },
+        )
         log_node_success(run_id, "save_report_node", (perf_counter() - start) * 1000)
         return {
             "run_id": run_id,
             "status": "degraded",
+            "final_report": report,
+            "report_path": report_path,
             "errors": [*state.get("errors", []), error],
             "completed_at": datetime.now(UTC),
         }

@@ -130,12 +130,29 @@ def test_save_report_node_degrades_on_persistence_error(monkeypatch, tmp_path):
     def _boom(**kwargs):
         raise RuntimeError("db down")
 
+    json_calls = []
+    md_calls = []
+
+    def _fake_json(run_id, payload):
+        json_calls.append((run_id, payload))
+        return str(tmp_path / "r.json")
+
+    def _fake_md(run_id, report):
+        md_calls.append((run_id, report))
+        return str(tmp_path / "r.md")
+
     monkeypatch.setattr(workflow, "persist_research_run", _boom)
-    monkeypatch.setattr(workflow, "save_report_json", lambda *a: str(tmp_path / "r.json"))
-    monkeypatch.setattr(workflow, "save_report_markdown", lambda *a: str(tmp_path / "r.md"))
+    monkeypatch.setattr(workflow, "save_report_json", _fake_json)
+    monkeypatch.setattr(workflow, "save_report_markdown", _fake_md)
     monkeypatch.setattr(workflow, "save_run", lambda *a: {})
 
     state = {"run_id": "run-y", "ticker": "AAPL", "status": "success", "draft_report": _sample_report()}
     out = workflow.save_report_node(state)
     assert out["status"] == "degraded"
     assert any(getattr(e, "error_type", "") == "persistence_error" for e in out["errors"])
+    # Export files must always be written even when PG persistence fails.
+    assert len(json_calls) == 1, "save_report_json must be called on degrade path"
+    assert len(md_calls) == 1, "save_report_markdown must be called on degrade path"
+    assert "report_path" in out, "degraded result must include report_path"
+    assert out["report_path"] == str(tmp_path / "r.json")
+    assert out.get("final_report") is not None, "degraded result must include final_report"

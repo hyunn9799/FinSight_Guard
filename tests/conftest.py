@@ -1,6 +1,7 @@
 """Shared pytest fixtures, including the PostgreSQL test session."""
 
 import os
+from pathlib import Path
 
 import pytest
 from alembic import command
@@ -18,7 +19,7 @@ def alembic_migrated_db():
     url = _test_url()
     if not url:
         pytest.skip("TEST_DATABASE_URL not set")
-    cfg = Config("alembic.ini")
+    cfg = Config(str(Path(__file__).resolve().parent.parent / "alembic.ini"))
     command.upgrade(cfg, "head")
     return url
 
