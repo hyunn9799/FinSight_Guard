@@ -102,3 +102,24 @@ class ProjectionRepository(BaseRepository):
             "source_table": record.source_table,
             "source_id": str(record.source_id),
         }
+
+    def upsert_term(
+        self, term: str, normalized_term: str, language: str | None = None
+    ) -> KeywordTerm:
+        query = self.session.query(KeywordTerm).filter(
+            KeywordTerm.normalized_term == normalized_term
+        )
+        if language is None:
+            query = query.filter(KeywordTerm.language.is_(None))
+        else:
+            query = query.filter(KeywordTerm.language == language)
+        existing = query.one_or_none()
+        if existing is not None:
+            return existing
+        record = KeywordTerm(term=term, normalized_term=normalized_term, language=language)
+        self.session.add(record)
+        self.session.flush()
+        return record
+
+    def list_terms(self) -> list[KeywordTerm]:
+        return self.session.query(KeywordTerm).order_by(KeywordTerm.normalized_term).all()

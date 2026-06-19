@@ -166,3 +166,22 @@ def test_projection_reupsert_resets_status_to_pending(db_session):
     )
     assert third.id == original_id
     assert third.status == "success", "explicit status= must be honoured on re-upsert"
+
+
+@REQUIRES_DB
+def test_keyword_term_upsert_is_unique_per_normalized_language(db_session):
+    from src.db.repositories.projection_repository import ProjectionRepository
+
+    repo = ProjectionRepository(db_session)
+    a = repo.upsert_term("Apple", "apple", language="en")
+    b = repo.upsert_term("APPLE", "apple", language="en")
+    assert a.id == b.id  # same (normalized_term, language) returns existing
+
+    ko = repo.upsert_term("사과", "apple", language="ko")
+    assert ko.id != a.id  # different language is a distinct term
+
+    none1 = repo.upsert_term("apple", "apple", language=None)
+    none2 = repo.upsert_term("apple", "apple", language=None)
+    assert none1.id == none2.id  # NULL language collides with NULL language
+
+    assert len(repo.list_terms()) == 3
