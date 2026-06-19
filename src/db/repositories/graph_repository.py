@@ -159,3 +159,38 @@ class GraphRepository(BaseRepository):
             .order_by(EvidencePathStep.step_index)
             .all()
         )
+
+    def persist_evidence_path_from_spec(
+        self,
+        spec: dict,
+        *,
+        evidence_id_to_uuid: dict,
+        request_id=None,
+        ticker_id=None,
+    ) -> EvidencePath | None:
+        steps = [
+            step
+            for step in spec.get("steps", [])
+            if step.get("evidence_id") in evidence_id_to_uuid
+        ]
+        if not steps:
+            return None
+        path = self.add_evidence_path(
+            path_type=spec["path_type"],
+            path_summary=spec["path_summary"],
+            source_node_ref=spec["source_node_ref"],
+            target_node_ref=spec["target_node_ref"],
+            request_id=request_id,
+            ticker_id=ticker_id,
+            confidence_label=spec.get("confidence_label"),
+        )
+        for index, step in enumerate(steps):
+            self.add_path_step(
+                path.id,
+                step_index=index,
+                node_table="evidence_items",
+                node_id=evidence_id_to_uuid[step["evidence_id"]],
+                relationship_type=step["relationship_type"],
+                description=step.get("description", ""),
+            )
+        return path

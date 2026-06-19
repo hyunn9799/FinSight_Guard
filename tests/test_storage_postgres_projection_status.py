@@ -323,3 +323,63 @@ def test_evidence_path_step_index_is_unique_per_path(db_session):
                 path.id, step_index=0, node_table="evidence_items", node_id=uuid.uuid4(),
                 relationship_type="cite",
             )
+
+
+@REQUIRES_DB
+def test_persist_evidence_path_from_graph_context(db_session):
+    from src.db.repositories.evidence_repository import EvidenceRepository
+    from src.db.repositories.graph_repository import GraphRepository
+    from src.evidence.evidence_schema import EvidenceItem
+    from src.graph_rag.graph_context_builder import (
+        build_evidence_path_spec,
+        build_graph_context,
+    )
+
+    ticker = make_ticker(db_session)
+    request = make_request(db_session, ticker)
+
+    # "개선" is a POSITIVE_KEYWORD, so the builder emits an evidence-backed edge.
+    item = EvidenceItem(
+        evidence_id="ev-1",
+        source_type="news",
+        source_name="Reuters",
+        source_url="http://example.test/news",
+        collected_at=datetime.now(UTC),
+        ticker="AAPL",
+        metric_name="headline",
+        metric_value=None,
+        description="회사 실적이 크게 개선되었다",
+    )
+    context = build_graph_context(ticker.symbol, [item], focus="news_risk")
+
+    spec = build_evidence_path_spec(context)
+    assert spec is not None
+    assert spec["path_type"] == "graph_context"
+    assert any(step["evidence_id"] == "ev-1" for step in spec["steps"])
+
+    # Persist the canonical evidence item to obtain its UUID, then persist the path.
+    ev_row = EvidenceRepository(db_session).add_evidence(
+        item, request_id=request.id, ticker_id=ticker.id
+    )
+    repo = GraphRepository(db_session)
+    path = repo.persist_evidence_path_from_spec(
+        spec,
+        evidence_id_to_uuid={"ev-1": ev_row.id},
+        request_id=request.id,
+        ticker_id=ticker.id,
+    )
+    assert path is not None
+
+    steps = repo.list_steps(path.id)
+    assert len(steps) >= 1
+    assert [s.step_index for s in steps] == list(range(len(steps)))
+    assert all(s.node_table == "evidence_items" for s in steps)
+    assert all(s.node_id == ev_row.id for s in steps)
+
+
+def test_build_evidence_path_spec_returns_none_without_grounded_edges():
+    from src.graph_rag.graph_context_builder import build_evidence_path_spec
+    from src.graph_rag.graph_schema import GraphContext
+
+    empty = GraphContext(ticker="AAPL", focus="unknown")
+    assert build_evidence_path_spec(empty) is None

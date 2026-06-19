@@ -133,3 +133,31 @@ def build_graph_context(
         positive_relations=positive_relations,
         evidence_ids=[item.evidence_id for item in evidence_items if item.evidence_id],
     )
+
+
+def build_evidence_path_spec(graph_context: GraphContext) -> dict | None:
+    """Convert a GraphContext into a canonical evidence-path spec (no DB access).
+
+    Only edges that carry an ``evidence_id`` become path steps, so every step
+    can later resolve to a canonical ``evidence_items`` record. Returns ``None``
+    when no evidence-backed relations exist.
+    """
+    grounded = [edge for edge in graph_context.edges if edge.evidence_id]
+    if not grounded:
+        return None
+    company_ref = f"company:{graph_context.ticker.strip().upper()}"
+    return {
+        "path_type": "graph_context",
+        "path_summary": "; ".join(graph_context.key_relations_summary),
+        "source_node_ref": grounded[0].source_id,
+        "target_node_ref": company_ref,
+        "confidence_label": None,
+        "steps": [
+            {
+                "relationship_type": edge.relation_type,
+                "description": edge.description or "",
+                "evidence_id": edge.evidence_id,
+            }
+            for edge in grounded
+        ],
+    }
