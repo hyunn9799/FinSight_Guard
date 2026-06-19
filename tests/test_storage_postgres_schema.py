@@ -40,9 +40,9 @@ EXPECTED_TABLES = {
 }
 
 
-def test_metadata_has_exactly_us1_tables():
+def test_metadata_has_exactly_us1_and_us2_tables():
     from src.db.models import Base
-    assert EXPECTED_TABLES.issubset(set(Base.metadata.tables))
+    assert set(Base.metadata.tables) == EXPECTED_TABLES | US2_EXPECTED_TABLES
 
 
 def test_key_unique_constraints_declared():
@@ -97,8 +97,6 @@ US2_EXPECTED_TABLES = {
 
 @REQUIRES_DB
 def test_alembic_upgrade_creates_us2_tables(alembic_migrated_db):
-    from sqlalchemy import create_engine, inspect
-
     engine = create_engine(os.environ["TEST_DATABASE_URL"], future=True)
     insp = inspect(engine)
     table_names = set(insp.get_table_names())
