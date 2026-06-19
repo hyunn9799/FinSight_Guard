@@ -169,6 +169,72 @@ def test_projection_reupsert_resets_status_to_pending(db_session):
 
 
 @REQUIRES_DB
+def test_projection_reupsert_clears_stale_error_message(db_session):
+    """A re-upsert that leaves the 'failed' state must clear the prior error
+    message so a re-queued (pending) row carries no stale failure detail."""
+    from src.db.repositories.projection_repository import ProjectionRepository
+
+    repo = ProjectionRepository(db_session)
+    source_id = uuid.uuid4()
+    record = repo.upsert_status(
+        source_table="reports",
+        source_id=source_id,
+        target_system="opensearch",
+        projection_type="report_text",
+        projection_key="r1",
+        idempotency_key="stale-err",
+    )
+    repo.mark_failure(record, at=datetime.now(UTC), error_message="opensearch timeout")
+    assert record.error_message == "opensearch timeout"
+
+    # Re-upsert (defaults to pending) → stale error must be cleared.
+    requeued = repo.upsert_status(
+        source_table="reports",
+        source_id=source_id,
+        target_system="opensearch",
+        projection_type="report_text",
+        projection_key="r1",
+        idempotency_key="stale-err",
+    )
+    assert requeued.id == record.id
+    assert requeued.status == "pending"
+    assert requeued.error_message is None, "stale error must be cleared on re-queue"
+
+
+@REQUIRES_DB
+def test_list_by_status_returns_ordered_matches(db_session):
+    """list_by_status filters by status and returns deterministically ordered rows."""
+    from src.db.repositories.projection_repository import ProjectionRepository
+
+    repo = ProjectionRepository(db_session)
+    # Two pending rows inserted in non-sorted order, plus one success row.
+    repo.upsert_status(
+        source_table="reports", source_id=uuid.uuid4(),
+        target_system="opensearch", projection_type="report_text",
+        projection_key="b", idempotency_key="ls-b",
+    )
+    repo.upsert_status(
+        source_table="document_chunks", source_id=uuid.uuid4(),
+        target_system="pinecone", projection_type="chunk_embedding",
+        projection_key="a", idempotency_key="ls-a",
+    )
+    success_row = repo.upsert_status(
+        source_table="reports", source_id=uuid.uuid4(),
+        target_system="neo4j", projection_type="graph_edges",
+        projection_key="c", idempotency_key="ls-c",
+    )
+    repo.mark_success(success_row, at=datetime.now(UTC))
+
+    pending = repo.list_by_status("pending")
+    assert len(pending) == 2, "only the two pending rows match"
+    assert all(r.status == "pending" for r in pending)
+    # Ordered by (source_table, source_id, target_system, projection_type):
+    # "document_chunks" sorts before "reports".
+    assert pending[0].source_table == "document_chunks"
+    assert pending[1].source_table == "reports"
+
+
+@REQUIRES_DB
 def test_keyword_term_upsert_is_unique_per_normalized_language(db_session):
     from src.db.repositories.projection_repository import ProjectionRepository
 
@@ -383,3 +449,13 @@ def test_build_evidence_path_spec_returns_none_without_grounded_edges():
 
     empty = GraphContext(ticker="AAPL", focus="unknown")
     assert build_evidence_path_spec(empty) is None
+
+
+@REQUIRES_DB
+def test_persist_evidence_path_from_none_spec_returns_none(db_session):
+    """The builder returns None when no evidence-backed edges exist; persisting
+    that None must compose cleanly and return None, not raise."""
+    from src.db.repositories.graph_repository import GraphRepository
+
+    repo = GraphRepository(db_session)
+    assert repo.persist_evidence_path_from_spec(None, evidence_id_to_uuid={}) is None

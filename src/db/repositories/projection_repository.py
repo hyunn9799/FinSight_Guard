@@ -32,6 +32,11 @@ class ProjectionRepository(BaseRepository):
             existing.source_id = source_id
             existing.projection_key = projection_key
             existing.status = status
+            # A re-upsert registers a fresh projection attempt. Any error from a
+            # prior failed run is stale once the row leaves the "failed" state,
+            # so clear it to keep the ledger consistent (SER-008).
+            if status != "failed":
+                existing.error_message = None
             self.session.flush()
             return existing
         record = IndexProjectionStatus(
@@ -78,6 +83,10 @@ class ProjectionRepository(BaseRepository):
                 IndexProjectionStatus.source_table == source_table,
                 IndexProjectionStatus.source_id == source_id,
             )
+            .order_by(
+                IndexProjectionStatus.target_system,
+                IndexProjectionStatus.projection_type,
+            )
             .all()
         )
 
@@ -85,14 +94,25 @@ class ProjectionRepository(BaseRepository):
         return (
             self.session.query(IndexProjectionStatus)
             .filter(IndexProjectionStatus.status == status)
+            .order_by(
+                IndexProjectionStatus.source_table,
+                IndexProjectionStatus.source_id,
+                IndexProjectionStatus.target_system,
+                IndexProjectionStatus.projection_type,
+            )
             .all()
         )
 
     def failure_warning(self, record: IndexProjectionStatus) -> dict:
         """Return a non-mutating projection warning payload (SER-008).
 
-        This reads the failed projection row only; it never touches the
-        canonical source record identified by ``source_table``/``source_id``.
+        This reads the projection row only; it never touches the canonical
+        source record identified by ``source_table``/``source_id``.
+
+        Intended for degraded projections (``failed`` or ``stale`` per
+        SER-008). Calling it on a ``success``/``pending`` row is not an error
+        and simply echoes that status — callers should gate on the record's
+        status before surfacing the payload as a warning.
         """
         return {
             "target_system": record.target_system,
@@ -122,4 +142,8 @@ class ProjectionRepository(BaseRepository):
         return record
 
     def list_terms(self) -> list[KeywordTerm]:
-        return self.session.query(KeywordTerm).order_by(KeywordTerm.normalized_term).all()
+        return (
+            self.session.query(KeywordTerm)
+            .order_by(KeywordTerm.normalized_term, KeywordTerm.language, KeywordTerm.id)
+            .all()
+        )

@@ -162,12 +162,16 @@ class GraphRepository(BaseRepository):
 
     def persist_evidence_path_from_spec(
         self,
-        spec: dict,
+        spec: dict | None,
         *,
         evidence_id_to_uuid: dict,
         request_id=None,
         ticker_id=None,
     ) -> EvidencePath | None:
+        # build_evidence_path_spec returns None when no evidence-backed edges
+        # exist; accept that directly so the two functions compose cleanly.
+        if not spec:
+            return None
         steps = [
             step
             for step in spec.get("steps", [])
