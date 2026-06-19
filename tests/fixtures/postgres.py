@@ -4,7 +4,21 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
-from src.db.models import AnalysisRequest, Ticker
+from src.db.models import AnalysisRequest, Ticker, User
+
+
+def make_user(
+    session: Session,
+    *,
+    email: str | None = None,
+    display_name: str | None = None,
+    role: str = "demo",
+    status: str = "active",
+) -> User:
+    user = User(email=email, display_name=display_name, role=role, status=status)
+    session.add(user)
+    session.flush()
+    return user
 
 
 def make_ticker(session: Session, symbol: str = "AAPL", market: str = "NASDAQ", **kw) -> Ticker:

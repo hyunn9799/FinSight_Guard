@@ -39,10 +39,42 @@ EXPECTED_TABLES = {
     "structured_log_events",
 }
 
+US2_EXPECTED_TABLES = {
+    "index_projection_status",
+    "keyword_terms",
+    "wave_rules",
+    "wave_scenarios",
+    "wave_invalidation_conditions",
+    "wave_scenario_rules",
+    "evidence_paths",
+    "evidence_path_steps",
+}
 
-def test_metadata_has_exactly_us1_and_us2_tables():
+US3_EXPECTED_TABLES = {
+    "user_settings",
+    "notifications",
+    "portfolios",
+    "portfolio_items",
+}
+
+
+def test_metadata_has_exactly_us1_us2_us3_tables():
     from src.db.models import Base
-    assert set(Base.metadata.tables) == EXPECTED_TABLES | US2_EXPECTED_TABLES
+    assert set(Base.metadata.tables) == EXPECTED_TABLES | US2_EXPECTED_TABLES | US3_EXPECTED_TABLES
+
+
+@REQUIRES_DB
+def test_alembic_upgrade_creates_us3_tables(alembic_migrated_db):
+    engine = create_engine(os.environ["TEST_DATABASE_URL"], future=True)
+    insp = inspect(engine)
+    table_names = set(insp.get_table_names())
+    assert US3_EXPECTED_TABLES.issubset(table_names)
+
+    settings_uniques = [
+        set(c["column_names"]) for c in insp.get_unique_constraints("user_settings")
+    ]
+    assert {"user_id", "setting_key", "scope"} in settings_uniques
+    engine.dispose()
 
 
 def test_key_unique_constraints_declared():
@@ -81,18 +113,6 @@ def test_alembic_upgrade_creates_all_tables(alembic_migrated_db):
     table_names = set(inspect(engine).get_table_names())
     assert EXPECTED_TABLES.issubset(table_names)
     engine.dispose()
-
-
-US2_EXPECTED_TABLES = {
-    "index_projection_status",
-    "keyword_terms",
-    "wave_rules",
-    "wave_scenarios",
-    "wave_invalidation_conditions",
-    "wave_scenario_rules",
-    "evidence_paths",
-    "evidence_path_steps",
-}
 
 
 @REQUIRES_DB

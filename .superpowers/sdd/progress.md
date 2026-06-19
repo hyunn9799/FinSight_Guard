@@ -1,33 +1,24 @@
-# US2 PostgreSQL Research Ledger — Progress
+# US3 PostgreSQL UX Tables — Progress
 
-Plan: docs/superpowers/plans/2026-06-19-postgresql-research-ledger-us2.md
-Branch: feature/004-postgresql-us2
+Plan: docs/superpowers/plans/2026-06-19-postgresql-research-ledger-us3.md
+Branch: feature/004-postgresql-us3 (from main, which has US2 merged via #83)
 Test DB: postgresql+psycopg://finsight:finsight@localhost:5432/finsight_test (docker compose `db`)
+Env: export DATABASE_URL + TEST_DATABASE_URL before pytest; run via .venv/bin/python (3.12). Migration head before US3 = d305f4d1ff77 (US2).
 
 ## Tasks
-- Task 1: ORM models + constants + migration — complete (commits cad33dc..112292d, review clean after 1 fix)
-- Task 2: ProjectionRepository status lifecycle — complete (commits de57d99..905c405, review clean after 1 fix)
-- Task 3: ProjectionRepository keyword terms — complete (commit d83ce15, review clean, Approved no fixes)
-- Task 4: Idempotent document chunks — complete (commit 8ad925f, review Approved no fixes; ⚠️ resolved: DocumentChunk has UniqueConstraint(source_document_id, chunk_index) so one_or_none cannot raise)
-- Task 5: GraphRepository rules/scenarios/conditions/joins — complete (commits aedb41d..d828cf0, review Approved; fix: savepoint-isolated IntegrityError test for pristine output)
-- Task 6: GraphRepository evidence paths + steps — complete (commit 4430aa6, review Approved no fixes; savepoint pattern applied to step-index uniqueness test)
-- Task 7: graph_context_builder spec + persistence — complete (commit 3a6054c, review Approved; purity boundary confirmed no DB import; added required ticker="AAPL" to brief's EvidenceItem test)
-- Task 8: Safety scan + full validation + docs — complete (commit bd5b558, review Approved; full suite 254 passed/0 failed/0 skipped, US2-related failures 0)
-
-## Log
-- Env: venv (py3.12) created, requirements installed, docker `db` up, finsight_test DB created & migrated to US1 head 40be5b7bbb1d. Baseline US1 schema+safety tests: 8 passed.
-- Task 1: complete (commits cad33dc..112292d, review clean after 1 fix — restored exact-set metadata contract test)
-- Task 2: complete (commits de57d99..905c405; fix added test pinning re-upsert status reset semantics)
+- Task 1: 4 ORM models + constants + make_user fixture + migration + schema test — complete (commit 837bd98, review Approved no fixes; migration 07c7492119e4 chains after d305f4d1ff77)
+- Task 2: SettingsRepository (user_settings) — complete (commit 6f15226, review Approved no fixes)
+- Task 3: NotificationRepository (in-app only) — complete (commit f253004, review Approved; ⚠️ resolved: session.query is house style across all repos, not an inconsistency)
+- Task 4: PortfolioRepository (portfolios + items) — complete (commit 8ffe4a1, review Approved; "Important" item_metadata={} is moot — model column is nullable=False default=dict, so {} is required not a silent write)
+- Task 5: UserRepository + FR-019 anonymization — complete (commit dafa78d, review Approved; analysis_requests not imported → audit preservation structurally guaranteed). Minor (fix at final): unused make_user import in test_storage_postgres_privacy.py (genuinely dead — file complete at Task 5).
+- Task 6: Safety presence assertion + full validation + docs — complete (commit b2c7b62, review Approved; full suite 268 passed / 0 failed / 0 skipped, US3-related failures 0). Minor (fix at final): US3_TABLES constant defined mid-file not at module top.
 
 ## FINAL WHOLE-BRANCH REVIEW (opus): Ready to merge = YES
-- Range 2461648..bd5b558 (13 commits). Critical 0, Important 0, Minor only.
-- Confirmed: 8 tables (no US3 leak); migration chains after US1 head 40be5b7bbb1d, creates/drops only the 8, backward compatible; pure builder/repository boundary held (no DB import); SER-008 non-mutation real (failure_warning pure-read + refresh assertions + skip-unresolvable); SER-001/SC-005 full-schema token scan; IntegrityError tests savepoint-isolated; full suite 254 passed / 0 failed / 0 skipped.
-- All "forward import" / forward-reference concerns resolve clean at HEAD (no unused import remains).
-- Optional non-blocking tidy-ups suggested: move US2_EXPECTED_TABLES above its first use; add failure_warning non-failed guard/docstring.
+- Range 502a810..b2c7b62 (8 commits). Critical 0, Important 0, Minor only.
+- FR-019 anonymize verified correct: PII cleared, UX hard-deleted child-first (items before portfolios), analysis_requests untouched & audit-preservation proven by real-DB test. FR-020 (no delivery fields) + SER-001 (no order fields) honored. 4 tables, migration chains after d305f4d1ff77 touching only the 4. flush-not-commit. Full suite 268 passed / 0 / 0.
+- Cleanups applied post-review (commit after b2c7b62): dropped dead make_user import in privacy test; hoisted US3_TABLES to module top.
 
-## Minor findings deferred to final whole-branch review
-- No lint config / CI present in repo (ruff/flake8/F401 not enforced).
-- Task 2: `KeywordTerm` imported in projection_repository.py but unused until Task 3 (same file). Plan-verbatim forward import. Confirm used by end of Task 3.
-- Task 2: `make_request, make_ticker` imported in test_storage_postgres_projection_status.py but unused until Task 5/6/7 (same file). Plan-verbatim forward import. Confirm used by end of Task 7.
-- Task 2 (reviewer Minor, not fixed): list_by_status untested; failure_warning has no guard against non-failed status; last_attempt_at not asserted. Triage at final review.
-- Task 3 (reviewer Minor, not fixed): list_terms lacks secondary sort key (nondeterministic for same normalized_term); upsert_term ignores `term` display-form on collision (latest spelling does not win); in-function import style. Triage at final review.
+## Log
+- US3 branch created from main@502a810 (US2 merged). Baseline US1+US2 schema+safety: 10 passed. Plan committed.
+- Task 1: complete (commit 837bd98). Minor (deferred to final): US3 schema test engine.dispose() not in try/finally (pre-existing US2 pattern).
+- Task 2: complete (commit 6f15226). Minor (transient): make_ticker imported in test_storage_postgres_ux.py, unused until Task 3/4 (same file). No lint gate. Confirm used by end of Task 4.
