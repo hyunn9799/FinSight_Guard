@@ -108,3 +108,61 @@ def test_projection_failure_warning_does_not_mutate_canonical(db_session):
     db_session.refresh(doc)
     assert chunk.chunk_text == "본문"
     assert doc.status == "active"
+
+
+@REQUIRES_DB
+def test_projection_reupsert_resets_status_to_pending(db_session):
+    """Pin the re-index-queued semantic: re-calling upsert_status with the same
+    idempotency_key (no explicit status) resets status to 'pending', documents
+    that a fresh re-projection attempt is queued (spec.md scenario #1).
+    An explicit status= override is also honoured."""
+    from src.db.repositories.projection_repository import ProjectionRepository
+
+    repo = ProjectionRepository(db_session)
+    source_id = uuid.uuid4()
+
+    # Step 1: create a record (status defaults to "pending").
+    record = repo.upsert_status(
+        source_table="document_chunks",
+        source_id=source_id,
+        target_system="pinecone",
+        projection_type="chunk_embedding",
+        projection_key="vec-A",
+        idempotency_key="reupsert-test",
+    )
+    original_id = record.id
+    assert record.status == "pending"
+
+    # Step 2: mark it success so we can confirm the reset.
+    repo.mark_success(record, at=datetime.now(UTC))
+    assert record.status == "success"
+
+    # Step 3: re-call upsert_status with the same idempotency_key and a new
+    # projection_key, but no explicit status → status must reset to "pending".
+    second = repo.upsert_status(
+        source_table="document_chunks",
+        source_id=source_id,
+        target_system="pinecone",
+        projection_type="chunk_embedding",
+        projection_key="vec-B",
+        idempotency_key="reupsert-test",
+    )
+    assert second.id == original_id, "upsert must return the same row, not a new one"
+    assert second.status == "pending", (
+        "re-upsert without explicit status must reset to 'pending' "
+        "(re-index-queued semantic)"
+    )
+    assert second.projection_key == "vec-B", "projection_key must be updated on re-upsert"
+
+    # Step 4: re-call upsert_status with explicit status="success" → honoured.
+    third = repo.upsert_status(
+        source_table="document_chunks",
+        source_id=source_id,
+        target_system="pinecone",
+        projection_type="chunk_embedding",
+        projection_key="vec-B",
+        idempotency_key="reupsert-test",
+        status="success",
+    )
+    assert third.id == original_id
+    assert third.status == "success", "explicit status= must be honoured on re-upsert"
