@@ -105,3 +105,57 @@ class GraphRepository(BaseRepository):
             .order_by(WaveRule.rule_code)
             .all()
         )
+
+    def add_evidence_path(
+        self,
+        *,
+        path_type: str,
+        path_summary: str,
+        source_node_ref: str,
+        target_node_ref: str,
+        request_id=None,
+        ticker_id=None,
+        confidence_label: str | None = None,
+    ) -> EvidencePath:
+        path = EvidencePath(
+            path_type=path_type,
+            path_summary=path_summary,
+            source_node_ref=source_node_ref,
+            target_node_ref=target_node_ref,
+            request_id=request_id,
+            ticker_id=ticker_id,
+            confidence_label=confidence_label,
+        )
+        self.session.add(path)
+        self.session.flush()
+        return path
+
+    def add_path_step(
+        self,
+        evidence_path_id,
+        *,
+        step_index: int,
+        node_table: str,
+        node_id,
+        relationship_type: str,
+        description: str = "",
+    ) -> EvidencePathStep:
+        step = EvidencePathStep(
+            evidence_path_id=evidence_path_id,
+            step_index=step_index,
+            node_table=node_table,
+            node_id=node_id,
+            relationship_type=relationship_type,
+            description=description,
+        )
+        self.session.add(step)
+        self.session.flush()
+        return step
+
+    def list_steps(self, evidence_path_id) -> list[EvidencePathStep]:
+        return (
+            self.session.query(EvidencePathStep)
+            .filter(EvidencePathStep.evidence_path_id == evidence_path_id)
+            .order_by(EvidencePathStep.step_index)
+            .all()
+        )

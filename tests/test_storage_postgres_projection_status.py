@@ -262,3 +262,64 @@ def test_wave_rule_code_is_unique(db_session):
     with pytest.raises(IntegrityError):
         with db_session.begin_nested():  # SAVEPOINT — keeps outer tx clean
             repo.add_rule(rule_code="DUP", name="B", rule_type="corrective")
+
+
+@REQUIRES_DB
+def test_evidence_path_steps_are_ordered_and_reference_canonical_nodes(db_session):
+    from src.db.repositories.graph_repository import GraphRepository
+
+    repo = GraphRepository(db_session)
+    ticker = make_ticker(db_session)
+    request = make_request(db_session, ticker)
+    scenario = repo.add_scenario(name="S", ticker_id=ticker.id)
+    rule = repo.add_rule(rule_code="R1", name="r", rule_type="impulse")
+
+    path = repo.add_evidence_path(
+        path_type="graph_context",
+        path_summary="scenario S supports rule R1",
+        source_node_ref="scenario:S",
+        target_node_ref=f"company:{ticker.symbol}",
+        request_id=request.id,
+        ticker_id=ticker.id,
+    )
+    # Insert out of order to prove list_steps sorts by step_index.
+    repo.add_path_step(
+        path.id, step_index=1, node_table="wave_rules", node_id=rule.id,
+        relationship_type="supports",
+    )
+    repo.add_path_step(
+        path.id, step_index=0, node_table="wave_scenarios", node_id=scenario.id,
+        relationship_type="origin",
+    )
+
+    steps = repo.list_steps(path.id)
+    assert [s.step_index for s in steps] == [0, 1]
+    assert steps[0].node_table == "wave_scenarios"
+    assert steps[0].node_id == scenario.id  # resolves to a canonical record
+    assert steps[1].node_table == "wave_rules"
+    assert steps[1].node_id == rule.id
+
+
+@REQUIRES_DB
+def test_evidence_path_step_index_is_unique_per_path(db_session):
+    from sqlalchemy.exc import IntegrityError
+
+    from src.db.repositories.graph_repository import GraphRepository
+
+    repo = GraphRepository(db_session)
+    path = repo.add_evidence_path(
+        path_type="graph_context",
+        path_summary="x",
+        source_node_ref="a",
+        target_node_ref="b",
+    )
+    repo.add_path_step(
+        path.id, step_index=0, node_table="evidence_items", node_id=uuid.uuid4(),
+        relationship_type="cite",
+    )
+    with pytest.raises(IntegrityError):
+        with db_session.begin_nested():  # SAVEPOINT — keeps outer tx clean
+            repo.add_path_step(
+                path.id, step_index=0, node_table="evidence_items", node_id=uuid.uuid4(),
+                relationship_type="cite",
+            )
