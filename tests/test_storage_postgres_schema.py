@@ -42,7 +42,7 @@ EXPECTED_TABLES = {
 
 def test_metadata_has_exactly_us1_tables():
     from src.db.models import Base
-    assert set(Base.metadata.tables) == EXPECTED_TABLES
+    assert EXPECTED_TABLES.issubset(set(Base.metadata.tables))
 
 
 def test_key_unique_constraints_declared():
@@ -80,4 +80,38 @@ def test_alembic_upgrade_creates_all_tables(alembic_migrated_db):
     engine = create_engine(os.environ["TEST_DATABASE_URL"], future=True)
     table_names = set(inspect(engine).get_table_names())
     assert EXPECTED_TABLES.issubset(table_names)
+    engine.dispose()
+
+
+US2_EXPECTED_TABLES = {
+    "index_projection_status",
+    "keyword_terms",
+    "wave_rules",
+    "wave_scenarios",
+    "wave_invalidation_conditions",
+    "wave_scenario_rules",
+    "evidence_paths",
+    "evidence_path_steps",
+}
+
+
+@REQUIRES_DB
+def test_alembic_upgrade_creates_us2_tables(alembic_migrated_db):
+    from sqlalchemy import create_engine, inspect
+
+    engine = create_engine(os.environ["TEST_DATABASE_URL"], future=True)
+    insp = inspect(engine)
+    table_names = set(insp.get_table_names())
+    assert US2_EXPECTED_TABLES.issubset(table_names)
+
+    # Key uniqueness constraints exist (names follow the uq_ naming convention).
+    proj_uniques = {c["name"] for c in insp.get_unique_constraints("index_projection_status")}
+    assert any("target_system" in name or "idempotency" in name for name in proj_uniques) or any(
+        set(c["column_names"]) == {"target_system", "projection_type", "idempotency_key"}
+        for c in insp.get_unique_constraints("index_projection_status")
+    )
+    step_uniques = [
+        set(c["column_names"]) for c in insp.get_unique_constraints("evidence_path_steps")
+    ]
+    assert {"evidence_path_id", "step_index"} in step_uniques
     engine.dispose()

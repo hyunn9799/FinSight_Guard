@@ -14,3 +14,6 @@ RESULT_TYPES = frozenset(
     }
 )
 REQUEST_TYPES = frozenset({"research", "backtest", "robust_optimization", "graph_context"})
+
+PROJECTION_STATUSES = frozenset({"pending", "success", "failed", "stale"})
+TARGET_SYSTEMS = frozenset({"pinecone", "neo4j", "opensearch"})

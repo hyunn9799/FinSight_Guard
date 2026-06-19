@@ -220,3 +220,120 @@ class StructuredLogEvent(UUIDMixin, Base):
     evaluation_score: Mapped[float | None] = mapped_column(Numeric(asdecimal=False), nullable=True)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     event_metadata: Mapped[dict] = mapped_column("metadata", JSONB, default=dict, nullable=False)
+
+
+# ---------------------------------------------------------------------------
+# US2: Index-projection status, keyword terms, wave-theory graph records,
+#      and explainable evidence paths
+# ---------------------------------------------------------------------------
+
+
+class IndexProjectionStatus(UUIDMixin, Base):
+    __tablename__ = "index_projection_status"
+    __table_args__ = (
+        UniqueConstraint("target_system", "projection_type", "idempotency_key"),
+    )
+    source_table: Mapped[str] = mapped_column(String, nullable=False)
+    source_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    target_system: Mapped[str] = mapped_column(String, nullable=False)
+    projection_type: Mapped[str] = mapped_column(String, nullable=False)
+    projection_key: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(String, default="pending", nullable=False)
+    attempt_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    last_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_success_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    idempotency_key: Mapped[str] = mapped_column(String, nullable=False)
+
+
+class KeywordTerm(UUIDMixin, Base):
+    __tablename__ = "keyword_terms"
+    __table_args__ = (
+        UniqueConstraint("normalized_term", "language", postgresql_nulls_not_distinct=True),
+    )
+    term: Mapped[str] = mapped_column(String, nullable=False)
+    normalized_term: Mapped[str] = mapped_column(String, nullable=False)
+    language: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class WaveRule(UUIDMixin, TimestampMixin, Base):
+    __tablename__ = "wave_rules"
+    rule_code: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    rule_type: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(String, default="active", nullable=False)
+    source_document_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("source_documents.id"), nullable=True
+    )
+
+
+class WaveScenario(UUIDMixin, TimestampMixin, Base):
+    __tablename__ = "wave_scenarios"
+    ticker_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("tickers.id"), nullable=True)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    timeframe: Mapped[str | None] = mapped_column(String, nullable=True)
+    status: Mapped[str] = mapped_column(String, default="active", nullable=False)
+    confidence_label: Mapped[str | None] = mapped_column(String, nullable=True)
+
+
+class WaveInvalidationCondition(UUIDMixin, Base):
+    __tablename__ = "wave_invalidation_conditions"
+    scenario_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("wave_scenarios.id"), nullable=False)
+    condition_text: Mapped[str] = mapped_column(Text, nullable=False)
+    metric_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    threshold_value: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    direction: Mapped[str | None] = mapped_column(String, nullable=True)
+    source_document_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("source_documents.id"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class WaveScenarioRule(UUIDMixin, Base):
+    __tablename__ = "wave_scenario_rules"
+    __table_args__ = (UniqueConstraint("scenario_id", "rule_id", "role"),)
+    scenario_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("wave_scenarios.id"), nullable=False)
+    rule_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("wave_rules.id"), nullable=False)
+    role: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class EvidencePath(UUIDMixin, Base):
+    __tablename__ = "evidence_paths"
+    request_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("analysis_requests.id"), nullable=True
+    )
+    ticker_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("tickers.id"), nullable=True)
+    path_type: Mapped[str] = mapped_column(String, nullable=False)
+    path_summary: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    source_node_ref: Mapped[str] = mapped_column(String, nullable=False)
+    target_node_ref: Mapped[str] = mapped_column(String, nullable=False)
+    confidence_label: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class EvidencePathStep(UUIDMixin, Base):
+    __tablename__ = "evidence_path_steps"
+    __table_args__ = (UniqueConstraint("evidence_path_id", "step_index"),)
+    evidence_path_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("evidence_paths.id"), nullable=False
+    )
+    step_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    node_table: Mapped[str] = mapped_column(String, nullable=False)
+    node_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    relationship_type: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
