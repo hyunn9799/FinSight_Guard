@@ -185,3 +185,40 @@ def test_keyword_term_upsert_is_unique_per_normalized_language(db_session):
     assert none1.id == none2.id  # NULL language collides with NULL language
 
     assert len(repo.list_terms()) == 3
+
+
+@REQUIRES_DB
+def test_source_document_recrawl_preserves_revision_lineage(db_session):
+    from src.db.repositories.source_document_repository import SourceDocumentRepository
+
+    docs = SourceDocumentRepository(db_session)
+    original = docs.add_document(
+        document_type="news",
+        source_name="Reuters",
+        content_hash="h1",
+        collected_at=datetime.now(UTC),
+        source_url="http://example.test/a",
+    )
+    corrected = docs.add_correction(
+        original, content_hash="h2", collected_at=datetime.now(UTC)
+    )
+    assert corrected.id != original.id
+    assert corrected.revision_group_id == original.revision_group_id
+    assert corrected.supersedes_document_id == original.id
+
+
+@REQUIRES_DB
+def test_document_chunk_get_or_add_is_idempotent(db_session):
+    from src.db.repositories.source_document_repository import SourceDocumentRepository
+
+    docs = SourceDocumentRepository(db_session)
+    doc = docs.add_document(
+        document_type="news",
+        source_name="X",
+        content_hash="h",
+        collected_at=datetime.now(UTC),
+    )
+    first = docs.get_or_add_chunk(doc.id, 0, "hello", "ch0")
+    second = docs.get_or_add_chunk(doc.id, 0, "hello", "ch0")
+    assert first.id == second.id
+    assert len(docs.list_chunks(doc.id)) == 1
