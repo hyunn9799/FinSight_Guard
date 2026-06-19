@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, MetaData, Numeric, String, Text, UniqueConstraint, Boolean, func
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, MetaData, Numeric, String, Text, UniqueConstraint, Boolean, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -142,7 +142,9 @@ class ReportVersion(UUIDMixin, Base):
 class EvidenceItemRecord(UUIDMixin, Base):
     __tablename__ = "evidence_items"
     evidence_id: Mapped[str] = mapped_column(String, unique=True, nullable=False)
-    request_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("analysis_requests.id"), nullable=True)
+    request_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("analysis_requests.id"), index=True, nullable=True
+    )
     ticker_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("tickers.id"), nullable=True)
     analysis_result_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("analysis_results.id"), nullable=True)
     source_document_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("source_documents.id"), nullable=True)
@@ -232,13 +234,14 @@ class IndexProjectionStatus(UUIDMixin, Base):
     __tablename__ = "index_projection_status"
     __table_args__ = (
         UniqueConstraint("target_system", "projection_type", "idempotency_key"),
+        Index("ix_index_projection_status_source", "source_table", "source_id"),
     )
     source_table: Mapped[str] = mapped_column(String, nullable=False)
     source_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     target_system: Mapped[str] = mapped_column(String, nullable=False)
     projection_type: Mapped[str] = mapped_column(String, nullable=False)
     projection_key: Mapped[str] = mapped_column(String, nullable=False)
-    status: Mapped[str] = mapped_column(String, default="pending", nullable=False)
+    status: Mapped[str] = mapped_column(String, default="pending", index=True, nullable=False)
     attempt_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     last_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_success_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -363,6 +366,9 @@ class UserSettings(UUIDMixin, Base):
 
 class Notification(UUIDMixin, TimestampMixin, Base):
     __tablename__ = "notifications"
+    __table_args__ = (
+        Index("ix_notifications_user_id_created_at", "user_id", "created_at"),
+    )
     user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     ticker_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("tickers.id"), nullable=True)
     notification_type: Mapped[str] = mapped_column(String, nullable=False)
@@ -376,7 +382,9 @@ class Notification(UUIDMixin, TimestampMixin, Base):
 
 class Portfolio(UUIDMixin, TimestampMixin, Base):
     __tablename__ = "portfolios"
-    user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id"), index=True, nullable=True
+    )
     name: Mapped[str] = mapped_column(String, nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     base_currency: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -386,7 +394,9 @@ class Portfolio(UUIDMixin, TimestampMixin, Base):
 
 class PortfolioItem(UUIDMixin, TimestampMixin, Base):
     __tablename__ = "portfolio_items"
-    portfolio_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("portfolios.id"), nullable=False)
+    portfolio_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("portfolios.id"), index=True, nullable=False
+    )
     ticker_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tickers.id"), nullable=False)
     label: Mapped[str | None] = mapped_column(String, nullable=True)
     quantity_note: Mapped[str | None] = mapped_column(String, nullable=True)
