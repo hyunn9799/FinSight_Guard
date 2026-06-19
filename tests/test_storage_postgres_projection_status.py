@@ -260,4 +260,5 @@ def test_wave_rule_code_is_unique(db_session):
     repo = GraphRepository(db_session)
     repo.add_rule(rule_code="DUP", name="A", rule_type="impulse")
     with pytest.raises(IntegrityError):
-        repo.add_rule(rule_code="DUP", name="B", rule_type="corrective")
+        with db_session.begin_nested():  # SAVEPOINT — keeps outer tx clean
+            repo.add_rule(rule_code="DUP", name="B", rule_type="corrective")
