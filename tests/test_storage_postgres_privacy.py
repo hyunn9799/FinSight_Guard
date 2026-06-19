@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from tests.fixtures.postgres import make_request, make_ticker, make_user
+from tests.fixtures.postgres import make_request, make_ticker
 
 REQUIRES_DB = pytest.mark.skipif(
     not os.getenv("TEST_DATABASE_URL"), reason="TEST_DATABASE_URL not set"

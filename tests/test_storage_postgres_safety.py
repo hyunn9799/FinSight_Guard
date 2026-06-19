@@ -15,6 +15,13 @@ US2_TABLES = {
     "evidence_path_steps",
 }
 
+US3_TABLES = {
+    "user_settings",
+    "notifications",
+    "portfolios",
+    "portfolio_items",
+}
+
 
 def test_no_forbidden_columns_in_schema():
     from src.db.models import Base
@@ -33,14 +40,6 @@ def test_us2_tables_present_in_metadata():
     from src.db.models import Base
 
     assert US2_TABLES.issubset(set(Base.metadata.tables.keys()))
-
-
-US3_TABLES = {
-    "user_settings",
-    "notifications",
-    "portfolios",
-    "portfolio_items",
-}
 
 
 def test_us3_tables_present_in_metadata():
