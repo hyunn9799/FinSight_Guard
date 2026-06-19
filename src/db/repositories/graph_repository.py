@@ -1,5 +1,7 @@
 """Repository for canonical wave-theory graph records and evidence paths (US2)."""
 
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+
 from src.db.models import (
     EvidencePath,
     EvidencePathStep,
@@ -81,21 +83,16 @@ class GraphRepository(BaseRepository):
         return condition
 
     def link_scenario_rule(self, scenario_id, rule_id, *, role: str) -> WaveScenarioRule:
-        existing = (
-            self.session.query(WaveScenarioRule)
-            .filter(
-                WaveScenarioRule.scenario_id == scenario_id,
-                WaveScenarioRule.rule_id == rule_id,
-                WaveScenarioRule.role == role,
+        stmt = (
+            pg_insert(WaveScenarioRule)
+            .values(scenario_id=scenario_id, rule_id=rule_id, role=role)
+            .on_conflict_do_update(
+                index_elements=["scenario_id", "rule_id", "role"],
+                set_={"scenario_id": WaveScenarioRule.scenario_id},
             )
-            .one_or_none()
+            .returning(WaveScenarioRule)
         )
-        if existing is not None:
-            return existing
-        link = WaveScenarioRule(scenario_id=scenario_id, rule_id=rule_id, role=role)
-        self.session.add(link)
-        self.session.flush()
-        return link
+        return self.session.scalars(stmt).one()
 
     def list_rules_for_scenario(self, scenario_id) -> list[WaveRule]:
         return (

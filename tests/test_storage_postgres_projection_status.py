@@ -459,3 +459,21 @@ def test_persist_evidence_path_from_none_spec_returns_none(db_session):
 
     repo = GraphRepository(db_session)
     assert repo.persist_evidence_path_from_spec(None, evidence_id_to_uuid={}) is None
+
+
+@REQUIRES_DB
+def test_get_or_add_chunk_returns_existing_without_overwrite(db_session):
+    from src.db.repositories.source_document_repository import SourceDocumentRepository
+
+    docs = SourceDocumentRepository(db_session)
+    doc = docs.add_document(
+        document_type="news", source_name="X", content_hash="h",
+        collected_at=datetime.now(UTC),
+    )
+    first = docs.get_or_add_chunk(doc.id, 0, "original", "ch0")
+    # Re-call with different text/hash for the same (doc, index): must return the
+    # existing row UNCHANGED (first-write-wins), not overwrite.
+    second = docs.get_or_add_chunk(doc.id, 0, "CHANGED", "ch0-new")
+    assert first.id == second.id
+    assert second.chunk_text == "original"
+    assert len(docs.list_chunks(doc.id)) == 1

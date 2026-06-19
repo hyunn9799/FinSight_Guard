@@ -2,6 +2,8 @@
 
 from datetime import datetime
 
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+
 from src.db.models import DocumentChunk, SourceDocument
 from src.db.repositories.base import BaseRepository
 
@@ -93,24 +95,23 @@ class SourceDocumentRepository(BaseRepository):
         token_count: int | None = None,
         metadata: dict | None = None,
     ) -> DocumentChunk:
-        existing = (
-            self.session.query(DocumentChunk)
-            .filter(
-                DocumentChunk.source_document_id == source_document_id,
-                DocumentChunk.chunk_index == chunk_index,
+        stmt = (
+            pg_insert(DocumentChunk)
+            .values(
+                source_document_id=source_document_id,
+                chunk_index=chunk_index,
+                chunk_text=chunk_text,
+                chunk_hash=chunk_hash,
+                token_count=token_count,
+                chunk_metadata=metadata if metadata is not None else {},
             )
-            .one_or_none()
+            .on_conflict_do_update(
+                index_elements=["source_document_id", "chunk_index"],
+                set_={"source_document_id": DocumentChunk.source_document_id},
+            )
+            .returning(DocumentChunk)
         )
-        if existing is not None:
-            return existing
-        return self.add_chunk(
-            source_document_id,
-            chunk_index,
-            chunk_text,
-            chunk_hash,
-            token_count=token_count,
-            metadata=metadata,
-        )
+        return self.session.scalars(stmt).one()
 
     def list_chunks(self, source_document_id) -> list[DocumentChunk]:
         return (
