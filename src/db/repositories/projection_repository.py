@@ -2,6 +2,8 @@
 
 from datetime import datetime
 
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+
 from src.db.models import IndexProjectionStatus, KeywordTerm
 from src.db.repositories.base import BaseRepository
 
@@ -126,20 +128,16 @@ class ProjectionRepository(BaseRepository):
     def upsert_term(
         self, term: str, normalized_term: str, language: str | None = None
     ) -> KeywordTerm:
-        query = self.session.query(KeywordTerm).filter(
-            KeywordTerm.normalized_term == normalized_term
+        stmt = (
+            pg_insert(KeywordTerm)
+            .values(term=term, normalized_term=normalized_term, language=language)
+            .on_conflict_do_update(
+                index_elements=["normalized_term", "language"],
+                set_={"normalized_term": KeywordTerm.normalized_term},
+            )
+            .returning(KeywordTerm)
         )
-        if language is None:
-            query = query.filter(KeywordTerm.language.is_(None))
-        else:
-            query = query.filter(KeywordTerm.language == language)
-        existing = query.one_or_none()
-        if existing is not None:
-            return existing
-        record = KeywordTerm(term=term, normalized_term=normalized_term, language=language)
-        self.session.add(record)
-        self.session.flush()
-        return record
+        return self.session.scalars(stmt).one()
 
     def list_terms(self) -> list[KeywordTerm]:
         return (

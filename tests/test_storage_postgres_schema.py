@@ -133,3 +133,20 @@ def test_alembic_upgrade_creates_us2_tables(alembic_migrated_db):
     ]
     assert {"evidence_path_id", "step_index"} in step_uniques
     engine.dispose()
+
+
+@REQUIRES_DB
+def test_query_indexes_exist(alembic_migrated_db):
+    engine = create_engine(os.environ["TEST_DATABASE_URL"], future=True)
+    insp = inspect(engine)
+
+    def col_sets(table):
+        return [tuple(ix["column_names"]) for ix in insp.get_indexes(table)]
+
+    assert ("user_id",) in col_sets("portfolios")
+    assert ("portfolio_id",) in col_sets("portfolio_items")
+    assert ("request_id",) in col_sets("evidence_items")
+    assert ("status",) in col_sets("index_projection_status")
+    assert ("user_id", "created_at") in col_sets("notifications")
+    assert ("source_table", "source_id") in col_sets("index_projection_status")
+    engine.dispose()
