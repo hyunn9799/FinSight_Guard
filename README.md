@@ -487,6 +487,21 @@ Eight tables were added in US2 to support index projections, keyword search, wav
 
 **SER-008:** Projection failures are recorded as `failed` or `stale` statuses (or surfaced as warnings) and never mutate canonical data. All eight tables are read-only from the canonical record perspective; projection errors affect only the projection ledger.
 
+### US3 tables
+
+Four tables were added in US3 to support user experience records (settings, in-app notifications, and research-only portfolio tracking):
+
+| Table | Role |
+|---|---|
+| `user_settings` | Per-user (or global default) key/value settings with optional scope; unique per `(user_id, setting_key, scope)`; soft-deletable |
+| `notifications` | In-app notification inbox — lifecycle: `unread → read → archived → deleted`; soft-deletable |
+| `portfolios` | Research-only portfolio groupings owned by a user; soft-deletable |
+| `portfolio_items` | Individual ticker entries within a portfolio; soft-deletable |
+
+**FR-019 anonymization policy:** Anonymizing a user strips PII from the `users` row (email, display name) and hard-deletes all user-owned UX records (`user_settings`, `notifications`, `portfolios`, `portfolio_items`). Research records (reports, evidence, source documents, node runs) and their audit trail remain resolvable under the anonymized owner.
+
+**FR-020:** Notifications are app-internal only. No external delivery fields (channel, delivery address, push token, email destination) are present in the `notifications` table.
+
 ## 한계
 
 - 이 프로젝트는 MVP/포트폴리오 목적의 연구 보조 시스템이며 production 금융 플랫폼이 아닙니다.
