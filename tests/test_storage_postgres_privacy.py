@@ -78,3 +78,28 @@ def test_anonymize_user_removes_pii_and_ux_but_preserves_audit(db_session):
         .count()
         == 0
     )
+
+
+@REQUIRES_DB
+def test_anonymize_transient_user_does_not_wipe_system_rows(db_session):
+    """Guard: anonymizing an unsaved user (id=None) must NOT delete NULL-owner
+    rows like system-default settings (`user_id IS NULL`)."""
+    from src.db.models import User
+    from src.db.repositories.settings_repository import SettingsRepository
+    from src.db.repositories.user_repository import UserRepository
+
+    # A system-default setting owned by no user (NULL user_id).
+    SettingsRepository(db_session).upsert_setting(
+        setting_key="rate_limit", setting_value={"rpm": 60}, scope="system"
+    )
+
+    transient = User(email="ghost@example.test")  # not added/flushed → id is None
+    assert transient.id is None
+
+    UserRepository(db_session).anonymize_user(transient, at=datetime.now(UTC))
+
+    # System-default row survives — the guard prevented an IS NULL mass delete.
+    assert (
+        SettingsRepository(db_session).get_setting(setting_key="rate_limit", scope="system")
+        is not None
+    )

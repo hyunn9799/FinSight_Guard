@@ -35,17 +35,21 @@ class UserRepository(BaseRepository):
         notifications, portfolios + items) are hard-deleted because they may
         contain PII and are not audit records.
         """
-        # Hard-delete portfolio items first (FK child of portfolios).
-        portfolio_ids = [
-            pid
-            for (pid,) in self.session.query(Portfolio.id).filter(
-                Portfolio.user_id == user.id
+        # Guard: a transient/unsaved user has id=None. Filtering on `== None`
+        # would compile to `user_id IS NULL` and wipe every NULL-owner row
+        # (e.g. system-default settings). Refuse to anonymize an unsaved user.
+        if user.id is None:
+            return user
+
+        # Hard-delete portfolio items first (FK child of portfolios). A
+        # correlated subquery does the cascade in one DELETE — no extra
+        # round-trip to fetch ids into Python, and the empty case is handled
+        # by the subquery returning no rows.
+        self.session.query(PortfolioItem).filter(
+            PortfolioItem.portfolio_id.in_(
+                self.session.query(Portfolio.id).filter(Portfolio.user_id == user.id)
             )
-        ]
-        if portfolio_ids:
-            self.session.query(PortfolioItem).filter(
-                PortfolioItem.portfolio_id.in_(portfolio_ids)
-            ).delete(synchronize_session=False)
+        ).delete(synchronize_session=False)
         self.session.query(Portfolio).filter(Portfolio.user_id == user.id).delete(
             synchronize_session=False
         )
