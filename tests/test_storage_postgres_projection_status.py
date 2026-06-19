@@ -222,3 +222,42 @@ def test_document_chunk_get_or_add_is_idempotent(db_session):
     second = docs.get_or_add_chunk(doc.id, 0, "hello", "ch0")
     assert first.id == second.id
     assert len(docs.list_chunks(doc.id)) == 1
+
+
+@REQUIRES_DB
+def test_graph_rules_scenarios_conditions_and_join(db_session):
+    from src.db.repositories.graph_repository import GraphRepository
+
+    repo = GraphRepository(db_session)
+    ticker = make_ticker(db_session)
+    rule = repo.add_rule(rule_code="W3-EXT", name="Wave 3 extension", rule_type="impulse")
+    scenario = repo.add_scenario(
+        name="Primary count", ticker_id=ticker.id, confidence_label="moderate"
+    )
+    condition = repo.add_invalidation_condition(
+        scenario.id,
+        condition_text="Breaks below the wave 1 high",
+        metric_name="price",
+        threshold_value=150.0,
+        direction="below",
+    )
+    assert condition.threshold_value == {"value": 150.0}  # scalar wrapped as JSON
+
+    link1 = repo.link_scenario_rule(scenario.id, rule.id, role="primary")
+    link2 = repo.link_scenario_rule(scenario.id, rule.id, role="primary")
+    assert link1.id == link2.id  # idempotent on (scenario, rule, role)
+
+    rules = repo.list_rules_for_scenario(scenario.id)
+    assert [r.rule_code for r in rules] == ["W3-EXT"]
+
+
+@REQUIRES_DB
+def test_wave_rule_code_is_unique(db_session):
+    from sqlalchemy.exc import IntegrityError
+
+    from src.db.repositories.graph_repository import GraphRepository
+
+    repo = GraphRepository(db_session)
+    repo.add_rule(rule_code="DUP", name="A", rule_type="impulse")
+    with pytest.raises(IntegrityError):
+        repo.add_rule(rule_code="DUP", name="B", rule_type="corrective")
