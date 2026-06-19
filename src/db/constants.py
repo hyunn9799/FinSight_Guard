@@ -17,3 +17,6 @@ REQUEST_TYPES = frozenset({"research", "backtest", "robust_optimization", "graph
 
 PROJECTION_STATUSES = frozenset({"pending", "success", "failed", "stale"})
 TARGET_SYSTEMS = frozenset({"pinecone", "neo4j", "opensearch"})
+
+USER_STATUSES = frozenset({"active", "disabled", "anonymized", "deleted"})
+NOTIFICATION_STATUSES = frozenset({"unread", "read", "archived", "deleted"})

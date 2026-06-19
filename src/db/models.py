@@ -337,3 +337,59 @@ class EvidencePathStep(UUIDMixin, Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+# ---------------------------------------------------------------------------
+# US3: MVP user-experience tables
+# ---------------------------------------------------------------------------
+
+
+class UserSettings(UUIDMixin, Base):
+    __tablename__ = "user_settings"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "setting_key", "scope", postgresql_nulls_not_distinct=True
+        ),
+    )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    setting_key: Mapped[str] = mapped_column(String, nullable=False)
+    setting_value: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    scope: Mapped[str] = mapped_column(String, default="user", nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class Notification(UUIDMixin, TimestampMixin, Base):
+    __tablename__ = "notifications"
+    user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    ticker_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("tickers.id"), nullable=True)
+    notification_type: Mapped[str] = mapped_column(String, nullable=False)
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    body: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    payload: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    status: Mapped[str] = mapped_column(String, default="unread", nullable=False)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class Portfolio(UUIDMixin, TimestampMixin, Base):
+    __tablename__ = "portfolios"
+    user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    base_currency: Mapped[str | None] = mapped_column(String, nullable=True)
+    status: Mapped[str] = mapped_column(String, default="active", nullable=False)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class PortfolioItem(UUIDMixin, TimestampMixin, Base):
+    __tablename__ = "portfolio_items"
+    portfolio_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("portfolios.id"), nullable=False)
+    ticker_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tickers.id"), nullable=False)
+    label: Mapped[str | None] = mapped_column(String, nullable=True)
+    quantity_note: Mapped[str | None] = mapped_column(String, nullable=True)
+    cost_basis_note: Mapped[str | None] = mapped_column(String, nullable=True)
+    item_metadata: Mapped[dict] = mapped_column("metadata", JSONB, default=dict, nullable=False)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
