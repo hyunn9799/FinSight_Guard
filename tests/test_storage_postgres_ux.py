@@ -102,3 +102,37 @@ def test_notification_list_filters_status_and_excludes_deleted(db_session):
     assert {n.title for n in all_active} == {"A", "B"}  # deleted excluded
     unread_only = repo.list_for_user(user.id, status="unread")
     assert [n.title for n in unread_only] == ["A"]
+
+
+@REQUIRES_DB
+def test_portfolio_with_items_is_research_only(db_session):
+    from src.db.repositories.portfolio_repository import PortfolioRepository
+
+    repo = PortfolioRepository(db_session)
+    user = make_user(db_session)
+    ticker = make_ticker(db_session)
+    pf = repo.create_portfolio(name="관심 종목", base_currency="KRW", user_id=user.id)
+    item = repo.add_item(
+        pf.id,
+        ticker.id,
+        label="장기 관찰",
+        quantity_note="참고용 메모",
+        metadata={"note": "watchlist"},
+    )
+    assert item.portfolio_id == pf.id
+    assert item.ticker_id == ticker.id
+    assert item.item_metadata == {"note": "watchlist"}
+    assert [i.id for i in repo.list_items(pf.id)] == [item.id]
+    assert [p.id for p in repo.list_for_user(user.id)] == [pf.id]
+
+
+@REQUIRES_DB
+def test_portfolio_soft_delete_hides_from_list(db_session):
+    from src.db.repositories.portfolio_repository import PortfolioRepository
+
+    repo = PortfolioRepository(db_session)
+    user = make_user(db_session)
+    pf = repo.create_portfolio(name="삭제 대상", user_id=user.id)
+    repo.soft_delete_portfolio(pf)
+    assert pf.deleted_at is not None
+    assert repo.list_for_user(user.id) == []
