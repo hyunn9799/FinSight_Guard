@@ -1,0 +1,110 @@
+"""US2 PostgreSQL tests: projection status, keyword terms, graph, evidence paths."""
+
+import os
+import uuid
+from datetime import UTC, datetime
+
+import pytest
+
+from tests.fixtures.postgres import make_request, make_ticker
+
+REQUIRES_DB = pytest.mark.skipif(
+    not os.getenv("TEST_DATABASE_URL"), reason="TEST_DATABASE_URL not set"
+)
+
+
+@REQUIRES_DB
+def test_projection_status_lifecycle(db_session):
+    from src.db.repositories.projection_repository import ProjectionRepository
+
+    repo = ProjectionRepository(db_session)
+    record = repo.upsert_status(
+        source_table="document_chunks",
+        source_id=uuid.uuid4(),
+        target_system="pinecone",
+        projection_type="chunk_embedding",
+        projection_key="vec-1",
+        idempotency_key="idem-1",
+    )
+    assert record.status == "pending"
+    assert record.attempt_count == 0
+
+    now = datetime.now(UTC)
+    repo.mark_failure(record, at=now, error_message="pinecone timeout")
+    assert record.status == "failed"
+    assert record.attempt_count == 1
+    assert record.error_message == "pinecone timeout"
+
+    repo.mark_success(record, at=now)
+    assert record.status == "success"
+    assert record.attempt_count == 2
+    assert record.last_success_at is not None
+    assert record.error_message is None
+
+    repo.mark_stale(record)
+    assert record.status == "stale"
+
+
+@REQUIRES_DB
+def test_projection_upsert_is_idempotent_on_idempotency_key(db_session):
+    from src.db.repositories.projection_repository import ProjectionRepository
+
+    repo = ProjectionRepository(db_session)
+    source_id = uuid.uuid4()
+    first = repo.upsert_status(
+        source_table="reports",
+        source_id=source_id,
+        target_system="opensearch",
+        projection_type="report_text",
+        projection_key="r1",
+        idempotency_key="dup",
+    )
+    second = repo.upsert_status(
+        source_table="reports",
+        source_id=source_id,
+        target_system="opensearch",
+        projection_type="report_text",
+        projection_key="r1-updated",
+        idempotency_key="dup",
+    )
+    assert first.id == second.id
+    assert second.projection_key == "r1-updated"
+    assert len(repo.list_for_source("reports", source_id)) == 1
+
+
+@REQUIRES_DB
+def test_projection_failure_warning_does_not_mutate_canonical(db_session):
+    from src.db.repositories.projection_repository import ProjectionRepository
+    from src.db.repositories.source_document_repository import SourceDocumentRepository
+
+    docs = SourceDocumentRepository(db_session)
+    doc = docs.add_document(
+        document_type="news",
+        source_name="Reuters",
+        content_hash="h1",
+        collected_at=datetime.now(UTC),
+    )
+    chunk = docs.add_chunk(doc.id, 0, "본문", "ch0")
+
+    repo = ProjectionRepository(db_session)
+    record = repo.upsert_status(
+        source_table="document_chunks",
+        source_id=chunk.id,
+        target_system="pinecone",
+        projection_type="chunk_embedding",
+        projection_key="k",
+        idempotency_key="i",
+    )
+    repo.mark_failure(record, at=datetime.now(UTC), error_message="boom")
+    warning = repo.failure_warning(record)
+
+    assert warning["status"] == "failed"
+    assert warning["error_message"] == "boom"
+    assert warning["target_system"] == "pinecone"
+    assert warning["source_table"] == "document_chunks"
+
+    # SER-008: canonical records remain intact after a projection failure.
+    db_session.refresh(chunk)
+    db_session.refresh(doc)
+    assert chunk.chunk_text == "본문"
+    assert doc.status == "active"
