@@ -83,6 +83,35 @@ class SourceDocumentRepository(BaseRepository):
         self.session.flush()
         return chunk
 
+    def get_or_add_chunk(
+        self,
+        source_document_id,
+        chunk_index: int,
+        chunk_text: str,
+        chunk_hash: str,
+        *,
+        token_count: int | None = None,
+        metadata: dict | None = None,
+    ) -> DocumentChunk:
+        existing = (
+            self.session.query(DocumentChunk)
+            .filter(
+                DocumentChunk.source_document_id == source_document_id,
+                DocumentChunk.chunk_index == chunk_index,
+            )
+            .one_or_none()
+        )
+        if existing is not None:
+            return existing
+        return self.add_chunk(
+            source_document_id,
+            chunk_index,
+            chunk_text,
+            chunk_hash,
+            token_count=token_count,
+            metadata=metadata,
+        )
+
     def list_chunks(self, source_document_id) -> list[DocumentChunk]:
         return (
             self.session.query(DocumentChunk)

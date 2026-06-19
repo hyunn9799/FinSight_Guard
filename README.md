@@ -470,6 +470,23 @@ events). The previous local JSON/Markdown files are kept as export artifacts onl
 **Tests** require a running PostgreSQL and `TEST_DATABASE_URL`. When `TEST_DATABASE_URL`
 is unset, the PostgreSQL storage tests skip (they never silently pass).
 
+### US2 tables
+
+Eight tables were added in US2 to support index projections, keyword search, wave-theory graph records, and explainable evidence paths:
+
+| Table | Role |
+|---|---|
+| `index_projection_status` | Projection ledger — tracks per-record projection state (`pending`, `projected`, `failed`, `stale`) and idempotency key for re-runs |
+| `keyword_terms` | Keyword catalog — canonical search terms derived from research chunks, supporting FR-011 keyword-based retrieval |
+| `wave_rules` | Wave-theory graph records — named Elliott-wave rules with type classification |
+| `wave_scenarios` | Wave-theory graph records — scenario groupings linking a symbol/timeframe to a set of wave rules |
+| `wave_invalidation_conditions` | Wave-theory graph records — threshold conditions that invalidate a scenario |
+| `wave_scenario_rules` | Wave-theory graph records — many-to-many join between scenarios and rules |
+| `evidence_paths` | Explainable evidence paths — typed, confidence-labeled paths connecting source and target graph nodes |
+| `evidence_path_steps` | Explainable evidence paths — ordered steps within an evidence path, each referencing a canonical evidence record |
+
+**SER-008:** Projection failures are recorded as `failed` or `stale` statuses (or surfaced as warnings) and never mutate canonical data. All eight tables are read-only from the canonical record perspective; projection errors affect only the projection ledger.
+
 ## 한계
 
 - 이 프로젝트는 MVP/포트폴리오 목적의 연구 보조 시스템이며 production 금융 플랫폼이 아닙니다.
