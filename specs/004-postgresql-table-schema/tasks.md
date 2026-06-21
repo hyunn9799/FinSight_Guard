@@ -117,7 +117,7 @@
 - [ ] T047 [US2] Implement keyword term repository methods in `src/db/repositories/projection_repository.py`
 - [ ] T048 [US2] Implement wave rule, scenario, invalidation, and scenario-rule methods in `src/db/repositories/graph_repository.py`
 - [ ] T049 [US2] Implement evidence path and ordered path step methods in `src/db/repositories/graph_repository.py`
-- [ ] T050 [US2] Integrate canonical evidence path persistence with graph context builder output in `src/graph_rag/graph_context_builder.py`
+- [x] T050 [US2] Integrate canonical evidence path persistence with graph context builder output in `src/graph_rag/graph_context_builder.py` (live-wired into `persist_research_run` via `save_report_node`; see docs/superpowers/plans/2026-06-21-us2-canonical-persistence-wiring.md)
 - [ ] T051 [US2] Add projection failure warning behavior that never mutates canonical records in `src/db/repositories/projection_repository.py`
 
 **Checkpoint**: User Story 2 can rebuild derived projection inputs and preserve canonical graph records independently of derived services.
