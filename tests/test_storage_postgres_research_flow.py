@@ -31,6 +31,29 @@ def _sample_evidence(ticker="AAPL"):
     ]
 
 
+def _sample_graph_context(ticker="AAPL"):
+    from src.graph_rag.graph_schema import GraphContext, GraphEdge, GraphNode
+    return GraphContext(
+        ticker=ticker,
+        focus="comprehensive",
+        nodes=[
+            GraphNode(node_id="ev-source-1", node_type="event", name="실적 발표"),
+            GraphNode(node_id=f"company:{ticker}", node_type="company", name=ticker),
+        ],
+        edges=[
+            GraphEdge(
+                source_id="ev-source-1",
+                target_id=f"company:{ticker}",
+                relation_type="positive_driver",
+                evidence_id="ev-1",
+                description="실적 호조가 주가를 견인",
+            )
+        ],
+        key_relations_summary=["실적 호조 → 주가 상승"],
+        evidence_ids=["ev-1"],
+    )
+
+
 @REQUIRES_DB
 def test_persist_successful_research_run(db_session, monkeypatch):
     import src.db.persistence as persistence
@@ -178,6 +201,45 @@ def test_save_report_node_persists_then_exports(db_session, monkeypatch, tmp_pat
     assert out["request_id"]  # set from persistence
     from src.db.models import AnalysisRequest
     assert db_session.get(AnalysisRequest, out["request_id"]) is not None
+
+
+@REQUIRES_DB
+def test_persist_run_stores_graph_evidence_path(db_session, monkeypatch):
+    import src.db.persistence as persistence
+    from contextlib import contextmanager
+
+    @contextmanager
+    def _scope():
+        yield db_session
+
+    monkeypatch.setattr(persistence, "session_scope", _scope)
+
+    out = persistence.persist_research_run(
+        run_id="run-gc", ticker="AAPL", status="success",
+        report=_sample_report(), evidence=_sample_evidence(),
+        evaluation={"overall_pass": True, "source_grounding_score": 0.9},
+        graph_context=_sample_graph_context(),
+    )
+
+    from src.db.models import EvidencePath, EvidencePathStep, EvidenceItemRecord
+
+    path = db_session.get(EvidencePath, out["evidence_path_id"])
+    assert path is not None
+    assert path.path_type == "graph_context"
+    assert path.request_id == out["request_id"]
+
+    steps = (
+        db_session.query(EvidencePathStep)
+        .filter(EvidencePathStep.evidence_path_id == path.id)
+        .order_by(EvidencePathStep.step_index)
+        .all()
+    )
+    assert len(steps) == 1
+    assert steps[0].step_index == 0
+    assert steps[0].node_table == "evidence_items"
+    assert steps[0].relationship_type == "positive_driver"
+    # the step's node_id resolves to a persisted evidence row
+    assert db_session.get(EvidenceItemRecord, steps[0].node_id) is not None
 
 
 @REQUIRES_DB
