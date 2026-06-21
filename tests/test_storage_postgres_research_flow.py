@@ -303,6 +303,40 @@ def test_persist_run_without_graph_context_skips_path_and_projection(db_session,
 
 
 @REQUIRES_DB
+def test_save_report_node_persists_graph_path_and_metadata(db_session, monkeypatch, tmp_path):
+    import src.db.persistence as persistence
+    import src.graph.workflow as workflow
+    from contextlib import contextmanager
+
+    @contextmanager
+    def _scope():
+        yield db_session
+
+    saved_meta = {}
+    monkeypatch.setattr(persistence, "session_scope", _scope)
+    monkeypatch.setattr(workflow, "save_report_json", lambda run_id, payload: str(tmp_path / "r.json"))
+    monkeypatch.setattr(workflow, "save_report_markdown", lambda run_id, report: str(tmp_path / "r.md"))
+    monkeypatch.setattr(workflow, "save_run", lambda run_id, meta: saved_meta.update(meta))
+
+    from src.graph.state import EvaluationResult
+    evaluation = EvaluationResult(
+        overall_pass=True, source_grounding_score=1.0, numeric_consistency_score=1.0,
+        safety_score=1.0, risk_disclosure_score=1.0, freshness_score=1.0,
+    )
+    state = {
+        "run_id": "run-node-gc", "ticker": "AAPL", "status": "success",
+        "draft_report": _sample_report(), "evidence": _sample_evidence(),
+        "evaluation_result": evaluation, "graph_context": _sample_graph_context(),
+    }
+    out = workflow.save_report_node(state)
+    assert out["status"] == "success"
+
+    from src.db.models import EvidencePath
+    assert saved_meta.get("evidence_path_id") is not None
+    assert db_session.get(EvidencePath, saved_meta["evidence_path_id"]) is not None
+
+
+@REQUIRES_DB
 def test_save_report_node_degrades_on_persistence_error(monkeypatch, tmp_path):
     import src.graph.workflow as workflow
 

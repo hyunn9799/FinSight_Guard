@@ -369,6 +369,7 @@ def save_report_node(state: ResearchWorkflowState) -> dict:
             evidence=state.get("evidence", []),
             evaluation=evaluation,
             missing_data_notes=state.get("missing_data_notes", []),
+            graph_context=state.get("graph_context"),
         )
     except Exception as exc:  # persistence is required; degrade deterministically
         error = _workflow_error(
@@ -418,6 +419,7 @@ def save_report_node(state: ResearchWorkflowState) -> dict:
             "report_path": report_path,
             "markdown_path": markdown_path,
             "request_id": str(persisted.get("request_id")) if persisted.get("request_id") else None,
+            "evidence_path_id": str(persisted.get("evidence_path_id")) if persisted.get("evidence_path_id") else None,
         },
     )
     log_node_success(run_id, "save_report_node", (perf_counter() - start) * 1000)
