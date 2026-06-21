@@ -21,8 +21,10 @@ Wire built-but-uncalled US2 graph evidence-path persistence into persist_researc
 - Task 4: mark 004 T050 complete — COMPLETE (commit a174563, doc-only)
 
 ## RESUME HERE (next task)
-- ALL TASKS COMPLETE (1-4). Branch main..HEAD = 59bfa34..a174563. Final whole-branch review pending,
-  then superpowers:finishing-a-development-branch (PR/merge). No implementation work remains.
+- ALL TASKS COMPLETE (1-4). Branch main..HEAD = 59bfa34..a174563 (impl), ledger df1d366.
+- Final whole-branch review (opus): READY TO MERGE = YES. Critical 0, Important 0, Minor 2 (both
+  acceptable/non-blocking: unparameterized `dict` hint; function-body imports in tests).
+- Next: superpowers:finishing-a-development-branch (PR/merge) — AWAITING USER GO. No code work remains.
 - Before pytest, re-export DATABASE_URL + TEST_DATABASE_URL (see above) and ensure
   `docker compose up -d db` is running. Recreate .venv + pip install -r requirements.txt if gone.
 
