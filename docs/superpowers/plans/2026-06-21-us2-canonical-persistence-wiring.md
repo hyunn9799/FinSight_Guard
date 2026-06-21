@@ -23,6 +23,27 @@
 
 ---
 
+## Current State & Resume Point (verified 2026-06-21)
+
+Branch `feature/005-us2-canonical-persistence-wiring` @ `93a28b7`. Environment is bootstrapped: `docker compose up -d db` (container `finsight_guard-db-1`, healthy), `finsight_test` DB created, `.venv` (Python 3.12) has all `requirements.txt` deps including `psycopg[binary]`.
+
+**Before every pytest run, re-export (they do not persist across shells):**
+```bash
+export DATABASE_URL="postgresql+psycopg://finsight:finsight@localhost:5432/finsight_test"
+export TEST_DATABASE_URL="postgresql+psycopg://finsight:finsight@localhost:5432/finsight_test"
+```
+
+**Resume at Task 1 Step 3.** Task 1 Step 1 (the RED test + `_sample_graph_context` helper) is **already committed** in `93a28b7` — do not re-add it. Step 2 is **already verified**: the test fails with `TypeError: persist_research_run() got an unexpected keyword argument 'graph_context'` (it runs against the DB, not SKIP — env confirmed working).
+
+**Signatures verified against live code (2026-06-21) — the plan's code below is accurate as written:**
+- `persist_research_run(*, run_id, ticker, status, report, evidence, evaluation, node_runs=None, missing_data_notes=None)` — `src/db/persistence.py:36`; current evidence loop at lines 106-110; early-return result dict at line 78.
+- `GraphRepository.persist_evidence_path_from_spec(spec, *, evidence_id_to_uuid, request_id=None, ticker_id=None) -> EvidencePath | None` — `src/db/repositories/graph_repository.py:160`. Re-filters steps to those whose `evidence_id` is in the map, re-indexes `step_index` from 0, writes `node_table="evidence_items"`.
+- `build_evidence_path_spec(graph_context) -> dict | None` — `src/graph_rag/graph_context_builder.py:138`. Returns `None` when no edge carries an `evidence_id`.
+- `ProjectionRepository.upsert_status(*, source_table, source_id, target_system, projection_type, projection_key, idempotency_key, status="pending") -> IndexProjectionStatus` — `src/db/repositories/projection_repository.py:12`. Uniqueness lookup on `(target_system, projection_type, idempotency_key)`.
+- `save_report_node` — `src/graph/workflow.py`: `persist_research_run(...)` call at lines 364-372; success-path `save_run(...)` at lines 412-422.
+
+---
+
 ## File Structure
 
 - **Modify** `src/db/persistence.py` — add `graph_context` param to `persist_research_run`; build evidence-id→uuid map; persist evidence path + projection marker; return `evidence_path_id`. (Task 1, 2)
@@ -49,9 +70,9 @@ The existing degrade-on-persistence-error test (`test_save_report_node_degrades_
   - `persist_research_run(..., graph_context=None)` keyword param
   - `result["evidence_path_id"]: UUID | None` in the returned dict
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test — ALREADY COMMITTED in `93a28b7`. DO NOT re-add (duplicate `def` breaks collection).**
 
-Add to `tests/test_storage_postgres_research_flow.py`. Place a shared helper near the top (after `_sample_evidence`), then the test:
+Already present in `tests/test_storage_postgres_research_flow.py`: `_sample_graph_context` helper (lines 34-54, placed after `_sample_evidence`) and `test_persist_run_stores_graph_evidence_path` (lines 206-242). Shown here for reference only:
 
 ```python
 def _sample_graph_context(ticker="AAPL"):
@@ -116,10 +137,10 @@ def test_persist_run_stores_graph_evidence_path(db_session, monkeypatch):
     assert db_session.get(EvidenceItemRecord, steps[0].node_id) is not None
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails — ✅ VERIFIED 2026-06-21**
 
 Run: `.venv/bin/python -m pytest tests/test_storage_postgres_research_flow.py::test_persist_run_stores_graph_evidence_path -v`
-Expected: FAIL — `persist_research_run() got an unexpected keyword argument 'graph_context'` (or `KeyError: 'evidence_path_id'` if the kwarg is silently accepted). If `TEST_DATABASE_URL` is unset the test SKIPS — set it first (see `tests/conftest.py` / `tests/fixtures/postgres.py`).
+Confirmed actual output: `FAILED ... TypeError: persist_research_run() got an unexpected keyword argument 'graph_context'` (1 failed). The test ran against `finsight_test` (did not SKIP), so DB + env are confirmed working. If you see SKIP instead, you forgot to export `DATABASE_URL`/`TEST_DATABASE_URL` (see Current State section above).
 
 - [ ] **Step 3: Write minimal implementation**
 
@@ -390,7 +411,7 @@ Expected: FAIL — `saved_meta.get("evidence_path_id")` is `None` because the no
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `src/graph/workflow.py`, find the `persist_research_run(...)` call inside `save_report_node` (around line 364) and add the `graph_context` argument:
+In `src/graph/workflow.py`, find the `persist_research_run(...)` call inside `save_report_node` (lines 364-372, the success path's `try` block) and add the `graph_context` argument as the last kwarg:
 
 ```python
         persisted = persist_research_run(
@@ -405,7 +426,7 @@ In `src/graph/workflow.py`, find the `persist_research_run(...)` call inside `sa
         )
 ```
 
-Then in the success-path `save_run(...)` call (around line 412-422), add the `evidence_path_id` key to the metadata dict:
+Then in the success-path `save_run(...)` call (lines 412-422, the metadata dict that already has `ticker`/`status`/`evaluation_score`/`report_path`/`markdown_path`/`request_id`), add the `evidence_path_id` key. Leave the degrade-path `save_run(...)` at lines 386-395 untouched:
 
 ```python
         save_run(
