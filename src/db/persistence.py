@@ -4,6 +4,7 @@ from src.db.postgres import session_scope
 from src.db.repositories.analysis_repository import AnalysisRepository
 from src.db.repositories.evidence_repository import EvidenceRepository
 from src.db.repositories.graph_repository import GraphRepository
+from src.db.repositories.projection_repository import ProjectionRepository
 from src.db.repositories.report_repository import ReportRepository
 from src.graph_rag.graph_context_builder import build_evidence_path_spec
 
@@ -126,6 +127,17 @@ def persist_research_run(
             request_id=request.id,
             ticker_id=ticker_row.id,
         )
+
+        if evidence_path is not None:
+            ProjectionRepository(session).upsert_status(
+                source_table="evidence_paths",
+                source_id=evidence_path.id,
+                target_system="neo4j",
+                projection_type="graph_evidence_path",
+                projection_key=f"evidence_path:{evidence_path.id}",
+                idempotency_key=f"evidence_paths:{evidence_path.id}:neo4j:graph_evidence_path",
+                status="pending",
+            )
 
         result["report_id"] = report_row.id
         result["report_version_id"] = version.id

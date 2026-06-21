@@ -243,6 +243,66 @@ def test_persist_run_stores_graph_evidence_path(db_session, monkeypatch):
 
 
 @REQUIRES_DB
+def test_persist_run_marks_projection_pending(db_session, monkeypatch):
+    import src.db.persistence as persistence
+    from contextlib import contextmanager
+
+    @contextmanager
+    def _scope():
+        yield db_session
+
+    monkeypatch.setattr(persistence, "session_scope", _scope)
+
+    out = persistence.persist_research_run(
+        run_id="run-proj", ticker="AAPL", status="success",
+        report=_sample_report(), evidence=_sample_evidence(),
+        evaluation={"overall_pass": True, "source_grounding_score": 0.9},
+        graph_context=_sample_graph_context(),
+    )
+
+    from src.db.models import IndexProjectionStatus
+
+    rows = (
+        db_session.query(IndexProjectionStatus)
+        .filter(IndexProjectionStatus.source_id == out["evidence_path_id"])
+        .all()
+    )
+    assert len(rows) == 1
+    row = rows[0]
+    assert row.source_table == "evidence_paths"
+    assert row.target_system == "neo4j"
+    assert row.projection_type == "graph_evidence_path"
+    assert row.status == "pending"
+    assert row.idempotency_key == f"evidence_paths:{out['evidence_path_id']}:neo4j:graph_evidence_path"
+    assert row.projection_key == f"evidence_path:{out['evidence_path_id']}"
+
+
+@REQUIRES_DB
+def test_persist_run_without_graph_context_skips_path_and_projection(db_session, monkeypatch):
+    import src.db.persistence as persistence
+    from contextlib import contextmanager
+
+    @contextmanager
+    def _scope():
+        yield db_session
+
+    monkeypatch.setattr(persistence, "session_scope", _scope)
+
+    out = persistence.persist_research_run(
+        run_id="run-nogc", ticker="AAPL", status="success",
+        report=_sample_report(), evidence=_sample_evidence(),
+        evaluation={"overall_pass": True, "source_grounding_score": 0.9},
+        graph_context=None,
+    )
+
+    from src.db.models import EvidencePath, IndexProjectionStatus
+
+    assert out["evidence_path_id"] is None
+    assert db_session.query(EvidencePath).count() == 0
+    assert db_session.query(IndexProjectionStatus).count() == 0
+
+
+@REQUIRES_DB
 def test_save_report_node_degrades_on_persistence_error(monkeypatch, tmp_path):
     import src.graph.workflow as workflow
 
