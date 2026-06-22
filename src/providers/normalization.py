@@ -104,8 +104,11 @@ def normalize_news(
             warnings.append(Warning(code="missing_title", message="news item missing title"))
             status = NormalizationStatus.PARTIAL_SUCCESS
             continue
+        item_warnings: list[Warning] = []
         if source_url is None:
-            warnings.append(Warning(code="missing_url", message="news item missing source url", field="source_url"))
+            missing_url_warning = Warning(code="missing_url", message="news item missing source url", field="source_url")
+            item_warnings.append(missing_url_warning)
+            warnings.append(missing_url_warning)
             status = NormalizationStatus.PARTIAL_SUCCESS
         records.append(
             NewsEvent(
@@ -118,7 +121,7 @@ def normalize_news(
                 source_url=source_url,
                 published_at=_parse_dt(item.published),
                 normalization_status=status,
-                warnings=[w for w in warnings if w.field == "source_url"],
+                warnings=item_warnings,
             )
         )
     overall = NormalizationStatus.SUCCESS if not warnings else NormalizationStatus.PARTIAL_SUCCESS

@@ -326,6 +326,27 @@ def test_fundamental_agent_boundary():
     assert agent_input["metrics"]["revenue"] == 1234.5
 
 
+def test_normalize_news_warnings_scoped_per_item():
+    # Regression: item 2 (with source_url) must NOT inherit item 1's missing_url warning.
+    # Item 1: Provider-A style — title+content, no url.
+    # Item 2: Provider-B style — headline+summary_text+source_url.
+    items = [
+        RawNewsItem(title="Item without URL", content="body text"),
+        RawNewsItem(headline="Item with URL", summary_text="summary", source_url="https://example.com/news/1"),
+    ]
+    result = normalize_news(
+        raw_items=items, request_id="req1", ticker_id="tk1", raw_response_id="raw1",
+    )
+    assert len(result.records) == 2, "both items must produce a NewsEvent"
+    rec0, rec1 = result.records
+    assert len(rec0.warnings) == 1
+    assert rec0.warnings[0].code == "missing_url"
+    assert rec1.warnings == [], "item with source_url must NOT inherit item 1's warning"
+    # result-level aggregate still carries the warning
+    assert any(w.code == "missing_url" for w in result.warnings), "aggregate warning must be preserved"
+    assert result.status == NormalizationStatus.PARTIAL_SUCCESS
+
+
 def test_market_agent_keeps_provider_data_separate_from_derived():
     md_ref = "md::req1::tk1::raw1"
     derived = [TechnicalAnalysisResult(

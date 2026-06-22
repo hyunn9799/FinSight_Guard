@@ -193,4 +193,6 @@ def persist_normalization(
                 normalization_status=rec.normalization_status.value,
                 warnings=warnings, evidence_id=rec.evidence_id,
             ))
+        else:
+            raise TypeError(f"persist_normalization received unsupported record type: {type(rec).__name__}")
     return out
