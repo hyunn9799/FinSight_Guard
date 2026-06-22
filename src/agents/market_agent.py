@@ -7,6 +7,7 @@ from src.evidence.evidence_builder import build_market_evidence
 from src.evidence.evidence_schema import EvidenceItem
 from src.graph.state import GraphState, MarketAnalysis, WorkflowError
 from src.indicators.technicals import enrich_market_indicators
+from src.providers.entities import TechnicalAnalysisResult
 from src.tools.market_data import fetch_price_history
 
 
@@ -226,9 +227,6 @@ def run_market_agent(state: GraphState) -> dict:
         "market_analysis": analysis,
         "evidence": [*state.get("evidence", []), *evidence],
     }
-
-
-from src.providers.entities import TechnicalAnalysisResult
 
 
 def market_inputs_to_agent_input(

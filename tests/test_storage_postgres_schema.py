@@ -57,10 +57,22 @@ US3_EXPECTED_TABLES = {
     "portfolio_items",
 }
 
+# 006 provider-agnostic MCP contract tables (T021/T022)
+US006_EXPECTED_TABLES = {
+    "raw_provider_responses",
+    "provider_company_profiles",
+    "provider_news_events",
+    "provider_financial_metrics",
+    "provider_technical_analysis_results",
+    "provider_wave_analysis_results",
+}
+
 
 def test_metadata_has_exactly_us1_us2_us3_tables():
     from src.db.models import Base
-    assert set(Base.metadata.tables) == EXPECTED_TABLES | US2_EXPECTED_TABLES | US3_EXPECTED_TABLES
+    assert set(Base.metadata.tables) == (
+        EXPECTED_TABLES | US2_EXPECTED_TABLES | US3_EXPECTED_TABLES | US006_EXPECTED_TABLES
+    )
 
 
 @REQUIRES_DB

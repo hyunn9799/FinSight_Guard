@@ -6,6 +6,7 @@ from typing import Any
 from src.evidence.evidence_builder import build_news_evidence
 from src.evidence.evidence_schema import EvidenceItem
 from src.graph.state import GraphState, NewsAnalysis, WorkflowError
+from src.providers.entities import NewsEvent as ContractNewsEvent
 from src.tools.news_search import search_recent_news
 
 
@@ -236,9 +237,6 @@ def run_news_agent(state: GraphState) -> dict:
         "news_analysis": analysis,
         "evidence": [*state.get("evidence", []), *evidence],
     }
-
-
-from src.providers.entities import NewsEvent as ContractNewsEvent
 
 
 def news_events_to_agent_input(events: list[ContractNewsEvent]) -> dict:

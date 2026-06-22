@@ -6,6 +6,7 @@ from typing import Any
 from src.evidence.evidence_builder import build_fundamental_evidence
 from src.evidence.evidence_schema import EvidenceItem
 from src.graph.state import FundamentalAnalysis, GraphState, WorkflowError
+from src.providers.entities import CompanyProfile, FinancialMetric
 from src.tools.financial_data import FINANCIAL_FIELDS, fetch_basic_financials
 
 
@@ -148,9 +149,6 @@ def run_fundamental_agent(state: GraphState) -> dict:
         "fundamental_analysis": analysis,
         "evidence": [*state.get("evidence", []), *evidence],
     }
-
-
-from src.providers.entities import CompanyProfile, FinancialMetric
 
 
 def fundamentals_to_agent_input(

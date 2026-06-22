@@ -4,7 +4,7 @@ from src.graph_rag.graph_context_builder import build_contract_graph_context
 from src.graph_rag.mapping_contracts import (
     GraphEligibleSpec, build_eligible_specs, is_graph_eligible,
 )
-from src.providers.entities import CompanyProfile, NewsEvent
+from src.providers.entities import NewsEvent
 from src.providers.enums import NormalizationStatus
 
 

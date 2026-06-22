@@ -1,14 +1,50 @@
 """User Story 1 contract tests (deterministic, no live calls)."""
 
 import pytest
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
+from src.agents.fundamental_agent import fundamentals_to_agent_input
+from src.agents.market_agent import market_inputs_to_agent_input
+from src.agents.news_agent import news_events_to_agent_input
+from src.providers.entities import (
+    CompanyProfile,
+    FinancialMetric,
+    NewsEvent,
+    TechnicalAnalysisResult,
+    WaveAnalysisResult,
+)
 from src.providers.enums import (
     DegradationStatus,
     NormalizationStatus,
     ProviderKind,
     RawResponseRef,
+    RuleStatus,
     Warning,
+)
+from src.providers.interfaces import (
+    NewsProvider,
+    NewsProviderResult,
+)
+from src.providers.normalization import (
+    NormalizationResult,
+    RawMarketData,
+    RawNewsItem,
+    normalize_company,
+    normalize_financials,
+    normalize_market_data,
+    normalize_news,
+)
+from src.providers.safety import (
+    SAFETY_CHECKED_CONTRACTS,
+    assert_no_trading_fields,
+    find_trading_fields,
+)
+from tests.fixtures.provider_contracts import (
+    raw_company_payload,
+    raw_financial_rows,
+    raw_market_data,
+    raw_news_provider_a,
+    raw_news_provider_b,
 )
 
 
@@ -38,18 +74,6 @@ def test_warning_is_structured():
 
 
 # Task 3 (T006): Normalized & derived entity contracts
-from datetime import UTC, datetime
-
-from src.providers.entities import (
-    CompanyProfile,
-    FinancialMetric,
-    NewsEvent,
-    TechnicalAnalysisResult,
-    WaveAnalysisResult,
-)
-from src.providers.enums import RuleStatus
-
-
 def test_news_event_minimal_and_forbids_extra():
     ev = NewsEvent(
         request_id="req1",
@@ -108,16 +132,6 @@ def test_company_and_financial_profiles():
 
 
 # Task 4 (T005): Provider interface Protocols + result models
-from src.providers.interfaces import (
-    FinancialProvider,
-    FinancialProviderResult,
-    MarketDataProvider,
-    MarketDataProviderResult,
-    NewsProvider,
-    NewsProviderResult,
-)
-
-
 def test_provider_results_carry_normalized_objects_only():
     res = NewsProviderResult(
         raw_response_ref="raw1",
@@ -149,16 +163,6 @@ def test_protocols_are_runtime_checkable():
 
 
 # Task 5 (T048): Token-based no-trading-field safety contract
-from pydantic import BaseModel
-
-from src.providers.safety import (
-    FORBIDDEN_TOKENS,
-    SAFETY_CHECKED_CONTRACTS,
-    assert_no_trading_fields,
-    find_trading_fields,
-)
-
-
 def test_token_matching_rejects_trading_field_names():
     class Bad(BaseModel):
         buy_signal: int = 0
@@ -192,14 +196,6 @@ def test_all_mvp_contracts_are_clean():
 
 
 # Task 6 (T007): Normalization result containers + helper seams
-from src.providers.normalization import (
-    NormalizationResult,
-    RawMarketData,
-    RawNewsItem,
-    normalize_news,
-)
-
-
 def test_normalization_result_container_shape():
     result = NormalizationResult(
         status=NormalizationStatus.SUCCESS, records=[], warnings=[], errors=[]
@@ -238,8 +234,6 @@ def test_public_exports_are_stable():
 
 # Task 8 (T009/T012): Two-shape news normalization with fixtures
 def test_equivalent_news_shapes_normalize_identically():
-    from tests.fixtures.provider_contracts import raw_news_provider_a, raw_news_provider_b
-
     common = dict(request_id="req1", ticker_id="tk1", raw_response_id="raw1")
     res_a = normalize_news(raw_items=raw_news_provider_a(), **common)
     res_b = normalize_news(raw_items=raw_news_provider_b(), **common)
@@ -259,14 +253,6 @@ def test_equivalent_news_shapes_normalize_identically():
 
 
 # Task 9 (T010/T013/T014): Company/financial/market fixtures and normalizers
-from src.providers.normalization import (
-    normalize_company, normalize_financials, normalize_market_data,
-)
-from tests.fixtures.provider_contracts import (
-    raw_company_payload, raw_financial_rows, raw_market_data,
-)
-
-
 def test_company_and_financial_boundary_preserved():
     common = dict(request_id="req1", ticker_id="tk1", raw_response_id="raw1")
     cres = normalize_company(raw=raw_company_payload(), **common)
@@ -320,12 +306,6 @@ def test_empty_market_data_insufficient():
 
 
 # Task 12 (T015/T016/T017): Agent boundary functions consuming normalized contracts
-from src.agents.news_agent import news_events_to_agent_input
-from src.agents.fundamental_agent import fundamentals_to_agent_input
-from src.agents.market_agent import market_inputs_to_agent_input
-from tests.fixtures.provider_contracts import raw_news_provider_a, raw_company_payload, raw_financial_rows
-
-
 def test_news_agent_boundary_consumes_contracts_only():
     res = normalize_news(
         raw_items=raw_news_provider_a(), request_id="req1", ticker_id="tk1", raw_response_id="raw1",

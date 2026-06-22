@@ -3,8 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from src.providers.entities import CompanyProfile, NewsEvent
-from src.providers.enums import DegradationStatus, NormalizationStatus
+from src.providers.enums import DegradationStatus
 from src.providers.scenario_input import ScenarioReportInput, VectorReference
 
 

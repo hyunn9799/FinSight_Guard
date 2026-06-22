@@ -7,7 +7,7 @@ normalized-record and degraded-scenario builders are filled in by later tasks.
 
 from __future__ import annotations
 
-from src.providers.normalization import RawNewsItem
+from src.providers.normalization import RawCompanyPayload, RawFinancialRow, RawMarketData, RawNewsItem
 
 
 def raw_news_provider_a() -> list[RawNewsItem]:
@@ -34,9 +34,6 @@ def raw_news_provider_b() -> list[RawNewsItem]:
             published="2026-06-01T13:00:00Z",
         )
     ]
-
-
-from src.providers.normalization import RawCompanyPayload, RawFinancialRow, RawMarketData
 
 
 def raw_company_payload() -> RawCompanyPayload:

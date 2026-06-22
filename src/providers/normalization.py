@@ -7,6 +7,7 @@ into the stable entity contracts. Bodies are filled in US1 (T012-T014).
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 from pydantic import ConfigDict, Field
@@ -77,7 +78,6 @@ class NormalizationResult(_Contract):
 
 
 # --- Helper seams (implemented in US1) --------------------------------------
-from datetime import datetime
 
 
 def _parse_dt(value: str | None) -> datetime | None:
