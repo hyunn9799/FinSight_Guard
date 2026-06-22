@@ -54,8 +54,10 @@ Base commit before Task 1: 45a3fdd
 
 - Unit 15 (Plan Task 18, T027/T028/T030 graph mapping eligibility): complete (commit 1869861; review Spec ✅ + quality Approved; 2/2 passed). Eligibility specs only (005 owns graph); raw/rows/dicts never eligible; both models subclass _Contract.
 
+- Unit 16 (Plan Task 19, T029/T031/T042/T044 VectorReference + ScenarioReportInput schema + tests): complete (commit 7a68462; TDD RED→GREEN; 25/25 passed). VectorReference: lightweight (source_kind Literal 3 values, canonical_ref_id non-empty validator, optional source_uri/chunk_id, NO score/store/embedding); ScenarioReportInput: full normalized input contract; both subclass _Contract (extra=forbid). ScenarioReportInput appended to SAFETY_CHECKED_CONTRACTS (tuple rebuilt); both exported from __init__.py. No circular imports. Compile gate clean.
+
 ## RESUME HERE (next task)
-- Dispatch Unit 16 (Plan Task 19, T029/T031/T042/T044 VectorReference + ScenarioReportInput schema + tests). Base = HEAD. Phase 5 US3. VectorReference is lightweight (source_kind, canonical_ref_id, optional source_uri, optional chunk_id — NO score/store/embedding). Append ScenarioReportInput to SAFETY_CHECKED_CONTRACTS in safety.py once it exists (T031).
+- Dispatch Unit 17 (Plan Task 20, T032/T043/T045 SRI builder + observability). Base = HEAD. Phase 5 US3.
 - NOTE: Runner `.venv/bin/python -m pytest` (NOT uv run); export DATABASE_URL + TEST_DATABASE_URL.
 
 ## Minor findings (whole-branch review triage)
