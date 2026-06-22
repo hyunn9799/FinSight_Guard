@@ -146,3 +146,46 @@ def test_protocols_are_runtime_checkable():
             )
 
     assert isinstance(_FakeNews(), NewsProvider)
+
+
+# Task 5 (T048): Token-based no-trading-field safety contract
+from pydantic import BaseModel
+
+from src.providers.safety import (
+    FORBIDDEN_TOKENS,
+    SAFETY_CHECKED_CONTRACTS,
+    assert_no_trading_fields,
+    find_trading_fields,
+)
+
+
+def test_token_matching_rejects_trading_field_names():
+    class Bad(BaseModel):
+        buy_signal: int = 0
+
+    class Bad2(BaseModel):
+        target_price: float = 0.0
+
+    class Bad3(BaseModel):
+        order_action: str = ""
+
+    for m in (Bad, Bad2, Bad3):
+        assert find_trading_fields(m), f"{m.__name__} should be flagged"
+        with pytest.raises(ValueError):
+            assert_no_trading_fields(m)
+
+
+def test_substrings_do_not_false_positive():
+    class Ok(BaseModel):
+        threshold: float = 0.0   # contains "hold" as substring -> must NOT match
+        household_count: int = 0  # token "household" != "hold"
+        metric_name: str = ""     # value could be "price"; names are clean
+
+    assert find_trading_fields(Ok) == []
+    assert_no_trading_fields(Ok)  # no raise
+
+
+def test_all_mvp_contracts_are_clean():
+    assert len(SAFETY_CHECKED_CONTRACTS) >= 5
+    for contract in SAFETY_CHECKED_CONTRACTS:
+        assert_no_trading_fields(contract)
