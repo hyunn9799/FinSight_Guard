@@ -105,3 +105,44 @@ def test_company_and_financial_profiles():
         normalization_status=NormalizationStatus.SUCCESS,
     )
     assert fm.metric_value == 1234.5
+
+
+# Task 4 (T005): Provider interface Protocols + result models
+from src.providers.interfaces import (
+    FinancialProvider,
+    FinancialProviderResult,
+    MarketDataProvider,
+    MarketDataProviderResult,
+    NewsProvider,
+    NewsProviderResult,
+)
+
+
+def test_provider_results_carry_normalized_objects_only():
+    res = NewsProviderResult(
+        raw_response_ref="raw1",
+        normalization_status=NormalizationStatus.SUCCESS,
+        news_events=[],
+    )
+    assert res.news_events == []
+    assert res.warnings == []
+    # result must not allow a raw payload field
+    with pytest.raises(ValidationError):
+        NewsProviderResult(
+            raw_response_ref="raw1",
+            normalization_status=NormalizationStatus.SUCCESS,
+            news_events=[],
+            payload_body={"x": 1},
+        )
+
+
+def test_protocols_are_runtime_checkable():
+    class _FakeNews:
+        def fetch_news(self, request):  # noqa: ANN001
+            return NewsProviderResult(
+                raw_response_ref="raw1",
+                normalization_status=NormalizationStatus.SUCCESS,
+                news_events=[],
+            )
+
+    assert isinstance(_FakeNews(), NewsProvider)
