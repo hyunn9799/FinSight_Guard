@@ -58,8 +58,10 @@ Base commit before Task 1: 45a3fdd
 
 - Unit 17 (Plan Task 20, T032/T043/T045 SRI builder + observability): complete (commit 7972599; review Spec ✅ + quality Approved; 28 passed). build_scenario_report_input degradation precedence verified against all 3 obs tests; missing categories → notes+warnings+status, never silent.
 
+- Unit 18 (Plan Task 21, T033 build_contract_graph_context): complete (commit 00a0b16; review Spec ✅ + quality Approved; 3/3 passed). Pure boundary fn, no Neo4j; reflects projection_status into degraded/warnings.
+
 ## RESUME HERE (next task)
-- Dispatch Unit 18 (Plan Task 21, T033 build_contract_graph_context degradation/stale handling). Base = HEAD. Then Unit 19 (Plan Task 22, T034 coordinator scenario boundary) — its import MUST go at TOP of coordinator_agent.py (E402). Sequential, not parallel.
+- Dispatch Unit 19 (Plan Task 22, T034 coordinator scenario boundary). Base = HEAD. CRITICAL: `from src.providers.scenario_input import ScenarioReportInput` MUST go at TOP of coordinator_agent.py (E402) — brief shows it mid-file. After Unit 19, US3 (Phase 5) DONE → Phase 6 polish (Units 20-22).
 - NOTE: Runner `.venv/bin/python -m pytest` (NOT uv run); export DATABASE_URL + TEST_DATABASE_URL.
 
 ## Minor findings (whole-branch review triage)
