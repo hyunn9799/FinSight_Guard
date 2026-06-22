@@ -149,7 +149,7 @@ def downgrade() -> None:
     op.drop_table('provider_news_events')
     op.drop_table('provider_financial_metrics')
     op.drop_table('provider_company_profiles')
-    op.drop_table('raw_provider_responses')
     op.drop_table('provider_wave_analysis_results')
     op.drop_table('provider_technical_analysis_results')
+    op.drop_table('raw_provider_responses')
     # ### end Alembic commands ###
