@@ -1,5 +1,6 @@
 """US3 graph mapping eligibility tests (no live graph)."""
 
+from src.graph_rag.graph_context_builder import build_contract_graph_context
 from src.graph_rag.mapping_contracts import (
     GraphEligibleSpec, build_eligible_specs, is_graph_eligible,
 )
@@ -28,3 +29,13 @@ def test_raw_and_row_level_data_not_projected():
     assert not is_graph_eligible({"candle": {"o": 1}})
     specs = build_eligible_specs([{"raw_candle": True}])
     assert specs == []
+
+
+def test_graph_context_degrades_when_projection_missing():
+    specs = build_eligible_specs([_news()])
+    ok = build_contract_graph_context(specs, projection_status="ready")
+    assert ok["degraded"] is False and ok["nodes"]
+
+    stale = build_contract_graph_context(specs, projection_status="stale")
+    assert stale["degraded"] is True
+    assert any("stale" in w.lower() or "missing" in w.lower() for w in stale["warnings"])
