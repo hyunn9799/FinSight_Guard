@@ -66,3 +66,15 @@ def raw_market_data() -> RawMarketData:
 #   T014      -> raw_market_data
 #   T018+     -> normalized record builders for persistence
 #   T029+     -> scenario_report_input builder
+
+
+def scenario_inputs_complete():
+    """Normalized records for a fully-populated scenario (deterministic)."""
+    common = dict(request_id="req1", ticker_id="tk1", raw_response_id="raw1")
+    from src.providers.normalization import (
+        normalize_company, normalize_financials, normalize_news,
+    )
+    cp = normalize_company(raw=raw_company_payload(), **common).records[0]
+    news = normalize_news(raw_items=raw_news_provider_a(), **common).records
+    metrics = normalize_financials(raw_rows=raw_financial_rows(), **common).records
+    return cp, news, metrics

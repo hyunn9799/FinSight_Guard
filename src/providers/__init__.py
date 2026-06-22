@@ -44,7 +44,7 @@ from src.providers.safety import (
     assert_no_trading_fields,
     find_trading_fields,
 )
-from src.providers.scenario_input import ScenarioReportInput, VectorReference
+from src.providers.scenario_input import ScenarioReportInput, VectorReference, build_scenario_report_input
 
 __all__ = [
     "CompanyProfile", "FinancialMetric", "NewsEvent",
@@ -58,5 +58,5 @@ __all__ = [
     "normalize_market_data", "normalize_news",
     "FORBIDDEN_TOKEN_PHRASES", "FORBIDDEN_TOKENS",
     "SAFETY_CHECKED_CONTRACTS", "assert_no_trading_fields", "find_trading_fields",
-    "VectorReference", "ScenarioReportInput",
+    "VectorReference", "ScenarioReportInput", "build_scenario_report_input",
 ]
