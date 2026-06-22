@@ -52,14 +52,17 @@ Base commit before Task 1: 45a3fdd
 
 - Unit 14 (Plan Task 17, T026 persist_normalization orchestration helper): complete (commit 8a663cc; review Spec ✅ + quality Approved; 4/4 + 27/27 no-regression). Imports at top of persistence.py (no E402); ownership boundary hard-enforced (006 tables only). US2 (Phase 4) DONE.
 
+- Unit 15 (Plan Task 18, T027/T028/T030 graph mapping eligibility): complete (commit 1869861; review Spec ✅ + quality Approved; 2/2 passed). Eligibility specs only (005 owns graph); raw/rows/dicts never eligible; both models subclass _Contract.
+
 ## RESUME HERE (next task)
-- Dispatch Unit 15 (Plan Task 18, T030 graph mapping eligibility impl + T027/T028 tests). Base = HEAD. Phase 5 US3 — graph mapping eligibility specs only (005 owns graph semantics). RawProviderResponse is NEVER graph-projected directly.
-- NOTE: graph mapping is pure contract logic (no DB needed for these tests, but Postgres still up). Before pytest: export DATABASE_URL + TEST_DATABASE_URL anyway. Runner `.venv/bin/python -m pytest` (NOT uv run).
+- Dispatch Unit 16 (Plan Task 19, T029/T031/T042/T044 VectorReference + ScenarioReportInput schema + tests). Base = HEAD. Phase 5 US3. VectorReference is lightweight (source_kind, canonical_ref_id, optional source_uri, optional chunk_id — NO score/store/embedding). Append ScenarioReportInput to SAFETY_CHECKED_CONTRACTS in safety.py once it exists (T031).
+- NOTE: Runner `.venv/bin/python -m pytest` (NOT uv run); export DATABASE_URL + TEST_DATABASE_URL.
 
 ## Minor findings (whole-branch review triage)
 - Unit 13: `AnalysisRepository` added to `src/db/repositories/__init__.py` export (not requested by brief; additive, non-breaking; reviewer accepted). Final review may keep or drop.
 - Unit 14: test uses function-body imports (lines ~117-119) — plan-mandated style across all 006 tests; not E402. Final review note only.
 - Unit 14: `persist_normalization` silently drops record types outside {NewsEvent,CompanyProfile,FinancialMetric} (no else-branch). Defensive-only; brief did not require handling. Final review may add `else: raise TypeError`.
+- Unit 15: `tests/test_provider_graphrag_mapping_contracts.py` imports `CompanyProfile` unused (F401) — brief artifact. Unit 22 ruff gate must remove. Also `is_graph_eligible` uses `type(x) in ...` (exact, not isinstance) — brief-mandated, fine.
 
 ## Known/accepted Minors (for final review triage)
 - Contract model `Warning` (src/providers/enums.py) shadows the builtin `Warning` exception. Functionally harmless (never raised/caught); accepted by plan. Final review may rename to `ProviderWarning` if desired.
