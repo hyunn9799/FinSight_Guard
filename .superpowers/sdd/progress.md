@@ -64,8 +64,10 @@ Base commit before Task 1: 45a3fdd
 
 - Unit 20 (Plan Task 23, T046 full safety contract test): complete (commit 1ab93c7; review Spec ✅ + quality Approved; 3/3 passed). Structural sweep over all SAFETY_CHECKED_CONTRACTS (incl ScenarioReportInput) + token-matching pos/neg examples + instance check.
 
+- Unit 21 (Plan Task 24, T035/T036 docs): complete (commit f110a73; review Spec ✅ + quality Approved). quickstart.md validation section corrected to `.venv/bin/python -m ...` (dropped erroneous uv run) + all 6 test files + ruff; PROJECT_PLAN.md "006 Provider Contract Boundary" subsection (ownership split + migration 8f1a2b3c4d5e). Docs-only, lossless.
+
 ## RESUME HERE (next task)
-- Dispatch Unit 21 (Plan Task 24, T035/T036 docs: quickstart.md + PROJECT_PLAN.md). Base = HEAD. Then Unit 22 (Task 25, T037-T041/T047 final validation gate — includes ruff: `uv pip install --python .venv/bin/python ruff` first, then relocate any mid-file imports + clear F401s + full-suite regression).
+- Dispatch Unit 22 (Plan Task 25, T037-T041/T047 FINAL VALIDATION GATE). Base = HEAD. Install ruff (`uv pip install --python .venv/bin/python ruff`), run `ruff check src tests`, fix findings (relocate mid-file imports to top; clear known F401 in tests/test_provider_graphrag_mapping_contracts.py + any others), behavior-preserving only. Then compileall + all 6 provider suites + FULL suite regression. After Unit 22 → final whole-branch review (opus) → finishing-a-development-branch.
 - NOTE: Runner `.venv/bin/python -m pytest` (NOT uv run); export DATABASE_URL + TEST_DATABASE_URL.
 
 ## Minor findings (whole-branch review triage)
