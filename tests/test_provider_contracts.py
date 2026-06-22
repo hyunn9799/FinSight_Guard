@@ -206,15 +206,17 @@ def test_normalization_result_container_shape():
     assert result.records == []
 
 
-def test_normalize_news_signature_exists_but_unimplemented():
-    # US1 (T012) implements the body; here we only assert the seam exists.
-    with pytest.raises(NotImplementedError):
-        normalize_news(
-            raw_items=[RawNewsItem(headline="x")],
-            request_id="req1",
-            ticker_id="tk1",
-            raw_response_id="raw1",
-        )
+def test_normalize_news_handles_incomplete_item():
+    # US1 (T012) implements the body; verify it handles minimal input.
+    result = normalize_news(
+        raw_items=[RawNewsItem(headline="x")],
+        request_id="req1",
+        ticker_id="tk1",
+        raw_response_id="raw1",
+    )
+    assert result.status == NormalizationStatus.PARTIAL_SUCCESS
+    assert len(result.records) == 1
+    assert result.records[0].title == "x"
 
 
 # Task 7 (T008): Stable public exports
@@ -231,3 +233,25 @@ def test_public_exports_are_stable():
         "assert_no_trading_fields", "SAFETY_CHECKED_CONTRACTS",
     ):
         assert hasattr(p, name), f"missing export: {name}"
+
+
+# Task 8 (T009/T012): Two-shape news normalization with fixtures
+def test_equivalent_news_shapes_normalize_identically():
+    from tests.fixtures.provider_contracts import raw_news_provider_a, raw_news_provider_b
+
+    common = dict(request_id="req1", ticker_id="tk1", raw_response_id="raw1")
+    res_a = normalize_news(raw_items=raw_news_provider_a(), **common)
+    res_b = normalize_news(raw_items=raw_news_provider_b(), **common)
+
+    assert res_a.status == NormalizationStatus.SUCCESS
+    assert res_b.status == NormalizationStatus.SUCCESS
+    assert [type(r) for r in res_a.records] == [NewsEvent]
+    assert [type(r) for r in res_b.records] == [NewsEvent]
+
+    a, b = res_a.records[0], res_b.records[0]
+    assert a.title == b.title == "Acme beats Q2 earnings"
+    assert a.summary == b.summary
+    assert a.source_url == b.source_url
+    # no provider-specific raw field leaks onto the contract:
+    assert "content" not in NewsEvent.model_fields
+    assert "headline" not in NewsEvent.model_fields

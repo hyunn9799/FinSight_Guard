@@ -77,10 +77,54 @@ class NormalizationResult(_Contract):
 
 
 # --- Helper seams (implemented in US1) --------------------------------------
+from datetime import datetime
+
+
+def _parse_dt(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
 def normalize_news(
     *, raw_items: list[RawNewsItem], request_id: str, ticker_id: str, raw_response_id: str
 ) -> NormalizationResult:
-    raise NotImplementedError("Implemented in US1 / T012")
+    records: list[NewsEvent] = []
+    warnings: list[Warning] = []
+    for item in raw_items:
+        title = item.title or item.headline
+        summary = item.content or item.summary_text
+        source_url = item.url or item.source_url
+        status = NormalizationStatus.SUCCESS
+        if title is None:
+            # cannot build a meaningful event without a title
+            warnings.append(Warning(code="missing_title", message="news item missing title"))
+            status = NormalizationStatus.PARTIAL_SUCCESS
+            continue
+        if source_url is None:
+            warnings.append(Warning(code="missing_url", message="news item missing source url", field="source_url"))
+            status = NormalizationStatus.PARTIAL_SUCCESS
+        records.append(
+            NewsEvent(
+                request_id=request_id,
+                ticker_id=ticker_id,
+                raw_response_id=raw_response_id,
+                title=title,
+                summary=summary,
+                source_name=item.source,
+                source_url=source_url,
+                published_at=_parse_dt(item.published),
+                normalization_status=status,
+                warnings=[w for w in warnings if w.field == "source_url"],
+            )
+        )
+    overall = NormalizationStatus.SUCCESS if not warnings else NormalizationStatus.PARTIAL_SUCCESS
+    if not records:
+        overall = NormalizationStatus.INSUFFICIENT_DATA
+    return NormalizationResult(status=overall, records=records, warnings=warnings)
 
 
 def normalize_company(
