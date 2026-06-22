@@ -148,3 +148,18 @@ def run_fundamental_agent(state: GraphState) -> dict:
         "fundamental_analysis": analysis,
         "evidence": [*state.get("evidence", []), *evidence],
     }
+
+
+from src.providers.entities import CompanyProfile, FinancialMetric
+
+
+def fundamentals_to_agent_input(
+    profile: CompanyProfile, metrics: list[FinancialMetric]
+) -> dict:
+    """Adapt normalized company/financial contracts into FundamentalAgent input."""
+    return {
+        "company_name": profile.company_name,
+        "sector": profile.sector,
+        "industry": profile.industry,
+        "metrics": {m.metric_name: m.metric_value for m in metrics},
+    }

@@ -226,3 +226,24 @@ def run_market_agent(state: GraphState) -> dict:
         "market_analysis": analysis,
         "evidence": [*state.get("evidence", []), *evidence],
     }
+
+
+from src.providers.entities import TechnicalAnalysisResult
+
+
+def market_inputs_to_agent_input(
+    *, market_data_ref: str | None, technical_results: list[TechnicalAnalysisResult]
+) -> dict:
+    """Keep provider market-data reference separate from derived technical results."""
+    return {
+        "market_data_ref": market_data_ref,
+        "technical": [
+            {
+                "indicator_values": t.indicator_values,
+                "trend_state": t.trend_state,
+                "momentum_state": t.momentum_state,
+                "volatility_state": t.volatility_state,
+            }
+            for t in technical_results
+        ],
+    }

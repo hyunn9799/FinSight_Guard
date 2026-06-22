@@ -317,3 +317,42 @@ def test_empty_market_data_insufficient():
         raw=RawMarketData(candles=[]), request_id="req1", ticker_id="tk1", raw_response_id="raw1",
     )
     assert res.status == NormalizationStatus.INSUFFICIENT_DATA
+
+
+# Task 12 (T015/T016/T017): Agent boundary functions consuming normalized contracts
+from src.agents.news_agent import news_events_to_agent_input
+from src.agents.fundamental_agent import fundamentals_to_agent_input
+from src.agents.market_agent import market_inputs_to_agent_input
+from tests.fixtures.provider_contracts import raw_news_provider_a, raw_company_payload, raw_financial_rows
+
+
+def test_news_agent_boundary_consumes_contracts_only():
+    res = normalize_news(
+        raw_items=raw_news_provider_a(), request_id="req1", ticker_id="tk1", raw_response_id="raw1",
+    )
+    agent_input = news_events_to_agent_input(res.records)
+    assert agent_input["count"] == 1
+    assert agent_input["titles"] == ["Acme beats Q2 earnings"]
+    # no raw provider keys present
+    assert "content" not in agent_input and "headline" not in agent_input
+
+
+def test_fundamental_agent_boundary():
+    common = dict(request_id="req1", ticker_id="tk1", raw_response_id="raw1")
+    cp = normalize_company(raw=raw_company_payload(), **common).records[0]
+    metrics = normalize_financials(raw_rows=raw_financial_rows(), **common).records
+    agent_input = fundamentals_to_agent_input(cp, metrics)
+    assert agent_input["company_name"] == "Acme Corp"
+    assert agent_input["metrics"]["revenue"] == 1234.5
+
+
+def test_market_agent_keeps_provider_data_separate_from_derived():
+    md_ref = "md::req1::tk1::raw1"
+    derived = [TechnicalAnalysisResult(
+        request_id="req1", ticker_id="tk1", source_market_data_refs=[md_ref],
+        indicator_values={"rsi_14": 55.0},
+        normalization_or_derivation_status=NormalizationStatus.SUCCESS,
+    )]
+    agent_input = market_inputs_to_agent_input(market_data_ref=md_ref, technical_results=derived)
+    assert agent_input["market_data_ref"] == md_ref
+    assert agent_input["technical"][0]["indicator_values"]["rsi_14"] == 55.0
