@@ -88,5 +88,11 @@ Base commit before Task 1: 45a3fdd
 - normalization.py imports CompanyProfile/FinancialMetric/NewsEvent currently unused at end of Unit 6 (F401 risk). RESOLVED: Units 8-9 implemented seam bodies that use them.
 - SYSTEMIC ruff E402 risk: plan code appends new `import` statements next to appended functions in EXISTING files (mid-file), not at top. Ruff default enables E402. Affected so far: src/agents/news_agent.py, fundamental_agent.py, market_agent.py (Unit 11). Future file-modifying units (persistence.py, coordinator_agent.py, graph_context_builder.py, scenario_input.py) likewise. MITIGATION: future implementers editing existing files told to put imports at TOP. Unit 22 (T041 ruff gate) must relocate any remaining mid-file imports to top-of-file and re-run ruff.
 
+## Post-PR review responses (PR #88)
+- Gemini code-assist left 7 inline comments (all "medium"). Triaged:
+  - **ACCEPTED (commit 0e9f9b2):** technical-result ORM column renamed `normalization_status` → `normalization_or_derivation_status` to match the Pydantic contract (entities.py:83) + data-model.md spec. Touched models.py + unmerged migration 8f1a2b3c4d5e + test kwarg. DB re-migrated (downgrade/upgrade), full suite 315/315. CORRECTS the earlier Unit-13 ledger note: the right fix was ORM→contract (`normalization_or_derivation_status`), NOT forcing tests to `normalization_status`. Only the derived `technical` table is affected; Company/News/Financial correctly keep `normalization_status`.
+  - **DECLINED (technical reasoning posted to threads):** 4× defensive `None`-guard suggestions on build_scenario_report_input + 3 agent boundary fns. Rationale: weakens `list[...]` type contract, conflicts with the design (missing = empty list, not None), YAGNI (no caller passes None). Will add guards if a real None-producing call path appears.
+
 ## Log
 - 2026-06-22: env bootstrapped (.venv created via uv, requirements installed, deps verified). Plan written. Fresh 006 ledger created (prior ledger was for completed US2 wiring feature).
+- 2026-06-22: all 22 units complete, final review clean, PR #88 opened/pushed; post-review naming fix (0e9f9b2) applied + review threads answered.
