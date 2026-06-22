@@ -255,3 +255,36 @@ def test_equivalent_news_shapes_normalize_identically():
     # no provider-specific raw field leaks onto the contract:
     assert "content" not in NewsEvent.model_fields
     assert "headline" not in NewsEvent.model_fields
+
+
+# Task 9 (T010/T013/T014): Company/financial/market fixtures and normalizers
+from src.providers.normalization import (
+    normalize_company, normalize_financials, normalize_market_data,
+)
+from tests.fixtures.provider_contracts import (
+    raw_company_payload, raw_financial_rows, raw_market_data,
+)
+
+
+def test_company_and_financial_boundary_preserved():
+    common = dict(request_id="req1", ticker_id="tk1", raw_response_id="raw1")
+    cres = normalize_company(raw=raw_company_payload(), **common)
+    fres = normalize_financials(raw_rows=raw_financial_rows(), **common)
+
+    assert [type(r) for r in cres.records] == [CompanyProfile]
+    assert cres.records[0].company_name == "Acme Corp"
+    assert all(type(r) is FinancialMetric for r in fres.records)
+    assert {r.metric_name for r in fres.records} == {"revenue", "net_income"}
+    # all normalized records trace to the raw response:
+    assert cres.records[0].raw_response_id == "raw1"
+    assert all(r.raw_response_id == "raw1" for r in fres.records)
+
+
+def test_market_data_normalizes_to_reference_not_derived_results():
+    res = normalize_market_data(
+        raw=raw_market_data(), request_id="req1", ticker_id="tk1", raw_response_id="raw1",
+    )
+    assert res.status == NormalizationStatus.SUCCESS
+    assert res.normalized_market_data_ref is not None
+    # market normalization MUST NOT emit technical/wave results
+    assert res.records == []

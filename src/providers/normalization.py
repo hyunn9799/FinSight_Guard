@@ -130,16 +130,58 @@ def normalize_news(
 def normalize_company(
     *, raw: RawCompanyPayload, request_id: str, ticker_id: str, raw_response_id: str
 ) -> NormalizationResult:
-    raise NotImplementedError("Implemented in US1 / T013")
+    name = raw.company_name or raw.name
+    if not name:
+        return NormalizationResult(
+            status=NormalizationStatus.INSUFFICIENT_DATA,
+            warnings=[Warning(code="missing_company_name", message="no company name in payload")],
+        )
+    profile = CompanyProfile(
+        request_id=request_id, ticker_id=ticker_id, raw_response_id=raw_response_id,
+        company_name=name, sector=raw.sector, industry=raw.industry,
+        country=raw.country, exchange=raw.exchange, currency=raw.currency,
+        description=raw.about, normalization_status=NormalizationStatus.SUCCESS,
+    )
+    return NormalizationResult(status=NormalizationStatus.SUCCESS, records=[profile])
 
 
 def normalize_financials(
     *, raw_rows: list[RawFinancialRow], request_id: str, ticker_id: str, raw_response_id: str
 ) -> NormalizationResult:
-    raise NotImplementedError("Implemented in US1 / T013")
+    records: list[FinancialMetric] = []
+    warnings: list[Warning] = []
+    for row in raw_rows:
+        metric_name = row.metric or row.name
+        if not metric_name:
+            warnings.append(Warning(code="missing_metric_name", message="financial row missing metric name"))
+            continue
+        value = row.value
+        records.append(
+            FinancialMetric(
+                request_id=request_id, ticker_id=ticker_id, raw_response_id=raw_response_id,
+                metric_name=metric_name,
+                metric_value=value if isinstance(value, (int, float, str)) or value is None else str(value),
+                period=row.period, currency=row.currency, unit=row.unit,
+                normalization_status=NormalizationStatus.SUCCESS,
+            )
+        )
+    status = NormalizationStatus.SUCCESS if records and not warnings else (
+        NormalizationStatus.PARTIAL_SUCCESS if records else NormalizationStatus.INSUFFICIENT_DATA
+    )
+    return NormalizationResult(status=status, records=records, warnings=warnings)
 
 
 def normalize_market_data(
     *, raw: RawMarketData, request_id: str, ticker_id: str, raw_response_id: str
 ) -> NormalizationResult:
-    raise NotImplementedError("Implemented in US1 / T014")
+    if not raw.candles:
+        return NormalizationResult(
+            status=NormalizationStatus.INSUFFICIENT_DATA,
+            warnings=[Warning(code="no_candles", message="market data has no candles")],
+        )
+    # A deterministic, content-addressable reference. Real market-data storage
+    # is 004/future work; 006 only emits a normalized reference handle.
+    ref = f"md::{request_id}::{ticker_id}::{raw_response_id}"
+    return NormalizationResult(
+        status=NormalizationStatus.SUCCESS, records=[], normalized_market_data_ref=ref,
+    )

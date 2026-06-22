@@ -36,6 +36,30 @@ def raw_news_provider_b() -> list[RawNewsItem]:
     ]
 
 
+from src.providers.normalization import RawCompanyPayload, RawFinancialRow, RawMarketData
+
+
+def raw_company_payload() -> RawCompanyPayload:
+    return RawCompanyPayload(
+        name="Acme Corp", sector="Technology", industry="Software",
+        country="US", exchange="NASDAQ", currency="USD", about="Maker of widgets.",
+    )
+
+
+def raw_financial_rows() -> list[RawFinancialRow]:
+    return [
+        RawFinancialRow(name="revenue", value=1234.5, period="FY2025", currency="USD", unit="millions"),
+        RawFinancialRow(metric="net_income", value=210.0, period="FY2025", currency="USD", unit="millions"),
+    ]
+
+
+def raw_market_data() -> RawMarketData:
+    return RawMarketData(
+        ticker="ACME",
+        candles=[{"t": "2026-06-01", "o": 10, "h": 11, "l": 9, "c": 10.5, "v": 1000}],
+    )
+
+
 # Builders are added incrementally:
 #   T009/T012 -> raw_news_provider_a / raw_news_provider_b
 #   T013      -> raw_company_payload / raw_financial_rows
