@@ -488,7 +488,7 @@ class ProviderTechnicalAnalysisResult(UUIDMixin, TimestampMixin, Base):
     trend_state: Mapped[str | None] = mapped_column(String, nullable=True)
     momentum_state: Mapped[str | None] = mapped_column(String, nullable=True)
     volatility_state: Mapped[str | None] = mapped_column(String, nullable=True)
-    normalization_status: Mapped[str] = mapped_column(String, nullable=False)
+    normalization_or_derivation_status: Mapped[str] = mapped_column(String, nullable=False)
     warnings: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
     evidence_ids: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
 

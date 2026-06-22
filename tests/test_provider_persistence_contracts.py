@@ -44,7 +44,7 @@ def test_derived_results_trace_to_market_and_evidence_not_raw(repo, request_and_
     tar = repo.create_technical_result(
         request_id=request_id, ticker_id=ticker_id,
         source_market_data_refs=["md::1"], indicator_values={"rsi_14": 55.0},
-        normalization_status=NormalizationStatus.SUCCESS.value, evidence_ids=["ev1"],
+        normalization_or_derivation_status=NormalizationStatus.SUCCESS.value, evidence_ids=["ev1"],
     )
     repo.session.flush()
     assert tar.source_market_data_refs == ["md::1"]

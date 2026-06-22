@@ -24,7 +24,7 @@ def upgrade() -> None:
     sa.Column('trend_state', sa.String(), nullable=True),
     sa.Column('momentum_state', sa.String(), nullable=True),
     sa.Column('volatility_state', sa.String(), nullable=True),
-    sa.Column('normalization_status', sa.String(), nullable=False),
+    sa.Column('normalization_or_derivation_status', sa.String(), nullable=False),
     sa.Column('warnings', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
     sa.Column('evidence_ids', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
     sa.Column('id', sa.UUID(), nullable=False),
