@@ -56,8 +56,10 @@ Base commit before Task 1: 45a3fdd
 
 - Unit 16 (Plan Task 19, T029/T031/T042/T044 VectorReference + ScenarioReportInput schema + tests): complete (commit 7a68462; TDD RED→GREEN; 25/25 passed). VectorReference: lightweight (source_kind Literal 3 values, canonical_ref_id non-empty validator, optional source_uri/chunk_id, NO score/store/embedding); ScenarioReportInput: full normalized input contract; both subclass _Contract (extra=forbid). ScenarioReportInput appended to SAFETY_CHECKED_CONTRACTS (tuple rebuilt); both exported from __init__.py. No circular imports. Compile gate clean.
 
+- Unit 17 (Plan Task 20, T032/T043/T045 SRI builder + observability): complete (commit 7972599; review Spec ✅ + quality Approved; 28 passed). build_scenario_report_input degradation precedence verified against all 3 obs tests; missing categories → notes+warnings+status, never silent.
+
 ## RESUME HERE (next task)
-- Dispatch Unit 17 (Plan Task 20, T032/T043/T045 SRI builder + observability). Base = HEAD. Phase 5 US3.
+- Dispatch Unit 18 (Plan Task 21, T033 build_contract_graph_context degradation/stale handling). Base = HEAD. Then Unit 19 (Plan Task 22, T034 coordinator scenario boundary) — its import MUST go at TOP of coordinator_agent.py (E402). Sequential, not parallel.
 - NOTE: Runner `.venv/bin/python -m pytest` (NOT uv run); export DATABASE_URL + TEST_DATABASE_URL.
 
 ## Minor findings (whole-branch review triage)
@@ -65,6 +67,7 @@ Base commit before Task 1: 45a3fdd
 - Unit 14: test uses function-body imports (lines ~117-119) — plan-mandated style across all 006 tests; not E402. Final review note only.
 - Unit 14: `persist_normalization` silently drops record types outside {NewsEvent,CompanyProfile,FinancialMetric} (no else-branch). Defensive-only; brief did not require handling. Final review may add `else: raise TypeError`.
 - Unit 15: `tests/test_provider_graphrag_mapping_contracts.py` imports `CompanyProfile` unused (F401) — brief artifact. Unit 22 ruff gate must remove. Also `is_graph_eligible` uses `type(x) in ...` (exact, not isinstance) — brief-mandated, fine.
+- Unit 17: `scenario_inputs_complete()` fixture uses function-body import (brief-mandated, fixture file already had one at line 39); `any([...])` list vs generator — trivial. Both polish-only, non-blocking.
 
 ## Known/accepted Minors (for final review triage)
 - Contract model `Warning` (src/providers/enums.py) shadows the builtin `Warning` exception. Functionally harmless (never raised/caught); accepted by plan. Final review may rename to `ProviderWarning` if desired.
