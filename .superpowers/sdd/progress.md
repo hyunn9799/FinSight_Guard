@@ -48,12 +48,16 @@ Base commit before Task 1: 45a3fdd
 - Unit 10 (Plan Task 11, T011 degradation tests): complete (commit 71a0edc; review clean; 20 passed; test-only, no impl change)
 - Unit 11 (Plan Task 12, T015-T017 agent boundary fns): complete (commit a759345; review clean; 23 passed + 16 agent regression). US1 (MVP) DONE.
 - Unit 12 (Plan Tasks 14+15, T021/T022/T023 ORM models + migration): complete (commits 0b9ddea, 1845a81; migration downgrade-order fix in follow-up commit). Verified: alembic upgrade head → downgrade -1 → upgrade head round-trips clean (FK children dropped before raw_provider_responses); 23 passed; compileall clean. Postgres up (finsight_guard-db-1 healthy).
+- Unit 13 (Plan Tasks 13+16 = T018/T019/T020 + T024/T025, persistence lineage tests + ProviderRepository): complete (commit b3ebd7e; review Spec ✅ + quality Approved; 26 passed with TEST_DATABASE_URL). Controller bundled ALL 3 of Task 13's tests here (so Unit 14 = Task 17 only). IMPORTANT downstream note: ORM column is `normalization_status` (NOT `status`) on technical/wave/etc — brief drafts that say `status=` are wrong; use `normalization_status=`.
 
 ## RESUME HERE (next task)
-- Dispatch Unit 13 (Plan Tasks 13+16, T018/T019/T024/T025 persistence tests + ProviderRepository, green). Base = HEAD.
+- Dispatch Unit 14 (Plan Task 17, T026 persist_normalization orchestration helper + 1 test, green). Base = HEAD (b3ebd7e). NOTE: ledger originally said Unit 14 = T020+T026, but T020 was absorbed into Unit 13; Unit 14 is now just Task 17 (T026).
 - NOTE: Phase 4 (US2) needs Postgres — already up (finsight_guard-db-1 healthy). Before pytest:
   `export DATABASE_URL="postgresql+psycopg://finsight:finsight@localhost:5432/finsight_test"` and
-  `export TEST_DATABASE_URL="$DATABASE_URL"`. ruff NOT installed in .venv — Unit 22 ruff gate must `uv pip install ruff` first (or `uv run ruff`).
+  `export TEST_DATABASE_URL="$DATABASE_URL"`. Runner is `.venv/bin/python -m pytest` (NOT uv run). ruff NOT installed in .venv — Unit 22 ruff gate must `uv pip install ruff` first.
+
+## Minor findings (whole-branch review triage)
+- Unit 13: `AnalysisRepository` added to `src/db/repositories/__init__.py` export (not requested by brief; additive, non-breaking; reviewer accepted). Final review may keep or drop.
 
 ## Known/accepted Minors (for final review triage)
 - Contract model `Warning` (src/providers/enums.py) shadows the builtin `Warning` exception. Functionally harmless (never raised/caught); accepted by plan. Final review may rename to `ProviderWarning` if desired.
