@@ -24,6 +24,7 @@ from src.providers.interfaces import (
     MarketDataProviderResult,
     NewsProviderResult,
 )
+from src.providers.scenario_input import ScenarioReportInput
 
 FORBIDDEN_TOKENS: frozenset[str] = frozenset(
     {
@@ -88,5 +89,5 @@ SAFETY_CHECKED_CONTRACTS: tuple[type[BaseModel], ...] = (
     NewsProviderResult,
     FinancialProviderResult,
     MarketDataProviderResult,
-    # ScenarioReportInput is appended after it exists (T031); T046 asserts coverage.
+    ScenarioReportInput,
 )
