@@ -66,9 +66,7 @@ Base commit before Task 1: 45a3fdd
 
 - Unit 21 (Plan Task 24, T035/T036 docs): complete (commit f110a73; review Spec ✅ + quality Approved). quickstart.md validation section corrected to `.venv/bin/python -m ...` (dropped erroneous uv run) + all 6 test files + ruff; PROJECT_PLAN.md "006 Provider Contract Boundary" subsection (ownership split + migration 8f1a2b3c4d5e). Docs-only, lossless.
 
-## RESUME HERE (next task)
-- Dispatch Unit 22 (Plan Task 25, T037-T041/T047 FINAL VALIDATION GATE). Base = HEAD. Install ruff (`uv pip install --python .venv/bin/python ruff`), run `ruff check src tests`, fix findings (relocate mid-file imports to top; clear known F401 in tests/test_provider_graphrag_mapping_contracts.py + any others), behavior-preserving only. Then compileall + all 6 provider suites + FULL suite regression. After Unit 22 → final whole-branch review (opus) → finishing-a-development-branch.
-- NOTE: Runner `.venv/bin/python -m pytest` (NOT uv run); export DATABASE_URL + TEST_DATABASE_URL.
+- Unit 22 (Plan Task 25, T037-T041/T047 FINAL VALIDATION GATE): complete (commit f8e3155). compile clean; 39/39 provider suites; 006 ruff surface clean; full suite 314/314. Lint fixes: mid-file imports relocated to top in 3 agent files + normalization.py + fixtures/provider_contracts.py; unused imports removed from test_provider_contracts.py (FORBIDDEN_TOKENS, FinancialProvider, MarketDataProvider, FinancialProviderResult, MarketDataProviderResult, UTC, datetime, raw_market_data fixture from second import), test_provider_graphrag_mapping_contracts.py (CompanyProfile), test_scenario_report_input_contract.py (CompanyProfile, NewsEvent, NormalizationStatus). test_storage_postgres_schema.py updated with US006_EXPECTED_TABLES to match new provider ORM tables. Pre-existing ruff issues (27 errors in backtest/graph/ux/storage files not touched by 006) left untouched. PHASE 6 (Polish) DONE. Branch ready for final whole-branch review.
 
 ## Minor findings (whole-branch review triage)
 - Unit 13: `AnalysisRepository` added to `src/db/repositories/__init__.py` export (not requested by brief; additive, non-breaking; reviewer accepted). Final review may keep or drop.
