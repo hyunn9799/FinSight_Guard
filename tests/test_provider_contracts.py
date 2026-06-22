@@ -215,3 +215,19 @@ def test_normalize_news_signature_exists_but_unimplemented():
             ticker_id="tk1",
             raw_response_id="raw1",
         )
+
+
+# Task 7 (T008): Stable public exports
+def test_public_exports_are_stable():
+    import src.providers as p
+
+    for name in (
+        "CompanyProfile", "NewsEvent", "FinancialMetric",
+        "TechnicalAnalysisResult", "WaveAnalysisResult",
+        "NewsProvider", "FinancialProvider", "MarketDataProvider",
+        "NormalizationStatus", "DegradationStatus",
+        "normalize_news", "normalize_company", "normalize_financials",
+        "normalize_market_data",
+        "assert_no_trading_fields", "SAFETY_CHECKED_CONTRACTS",
+    ):
+        assert hasattr(p, name), f"missing export: {name}"
