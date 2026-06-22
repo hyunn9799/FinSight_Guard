@@ -39,3 +39,21 @@ def test_scenario_report_input_excludes_raw_and_carries_required_fields():
             request_id="req1", ticker="ACME", degradation_status=DegradationStatus.COMPLETE,
             payload_body={"x": 1},
         )
+
+
+def test_coordinator_consumes_scenario_input_without_raw_fields():
+    from src.agents.coordinator_agent import scenario_report_input_to_agent_input
+    from src.providers.scenario_input import build_scenario_report_input
+    from tests.fixtures.provider_contracts import scenario_inputs_complete
+
+    cp, news, metrics = scenario_inputs_complete()
+    sri = build_scenario_report_input(
+        request_id="req1", ticker="ACME", company_profile=cp, news_events=news,
+        financial_metrics=metrics, technical_analysis_results=[], wave_analysis_results=[],
+        graph_context={"company": "ACME"}, vector_references=[],
+    )
+    agent_input = scenario_report_input_to_agent_input(sri)
+    assert agent_input["ticker"] == "ACME"
+    assert agent_input["news_count"] == len(news)
+    assert "payload_body" not in agent_input and "content" not in agent_input
+    assert agent_input["degradation_status"] == sri.degradation_status.value
