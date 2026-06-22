@@ -70,3 +70,24 @@ def test_partial_and_failed_normalization_recoverable(repo, request_and_ticker):
     repo.session.flush()
     assert fm.normalization_status == "partial_success"
     assert fm.warnings[0]["code"] == "missing_period"
+
+
+def test_persist_normalization_writes_raw_then_normalized(db_session, request_and_ticker):
+    from src.db.persistence import persist_normalization
+    from src.providers.normalization import normalize_news
+    from tests.fixtures.provider_contracts import raw_news_provider_a
+
+    request_id, ticker_id = request_and_ticker
+    res = normalize_news(
+        raw_items=raw_news_provider_a(), request_id=str(request_id),
+        ticker_id=str(ticker_id), raw_response_id="placeholder",
+    )
+    out = persist_normalization(
+        db_session, request_id=request_id, ticker_id=ticker_id,
+        raw_kwargs=dict(provider_name="provider_a", provider_kind="news", status="success"),
+        normalization_result=res,
+    )
+    db_session.flush()
+    assert out["raw_response_id"] is not None
+    assert len(out["news_events"]) == 1
+    assert out["news_events"][0].raw_response_id == out["raw_response_id"]

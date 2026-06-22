@@ -5,8 +5,15 @@ from src.db.repositories.analysis_repository import AnalysisRepository
 from src.db.repositories.evidence_repository import EvidenceRepository
 from src.db.repositories.graph_repository import GraphRepository
 from src.db.repositories.projection_repository import ProjectionRepository
+from src.db.repositories.provider_repository import ProviderRepository
 from src.db.repositories.report_repository import ReportRepository
 from src.graph_rag.graph_context_builder import build_evidence_path_spec
+from src.providers.entities import (
+    CompanyProfile,
+    FinancialMetric,
+    NewsEvent,
+)
+from src.providers.normalization import NormalizationResult
 
 _RESULT_STATUS_FOR = {
     "success": "success",
@@ -143,3 +150,47 @@ def persist_research_run(
         result["report_version_id"] = version.id
         result["evidence_path_id"] = evidence_path.id if evidence_path is not None else None
         return result
+
+
+def persist_normalization(
+    session, *, request_id, ticker_id, raw_kwargs: dict, normalization_result: NormalizationResult
+) -> dict:
+    """Persist a raw response and its normalized records (006 extension tables only).
+
+    Does NOT mutate any 004-owned table; only writes provider_* / raw_provider_responses.
+    """
+    repo = ProviderRepository(session)
+    raw = repo.create_raw_response(request_id=request_id, ticker_id=ticker_id, **raw_kwargs)
+    session.flush()
+    out: dict = {"raw_response_id": raw.id, "news_events": [], "company_profiles": [], "financial_metrics": []}
+    for rec in normalization_result.records:
+        warnings = [w.model_dump() for w in rec.warnings]
+        if isinstance(rec, NewsEvent):
+            out["news_events"].append(repo.create_news_event(
+                request_id=request_id, ticker_id=ticker_id, raw_response_id=raw.id,
+                title=rec.title, summary=rec.summary, source_name=rec.source_name,
+                source_url=rec.source_url, published_at=rec.published_at,
+                event_type=rec.event_type, sentiment_label=rec.sentiment_label,
+                risk_tags=rec.risk_tags, normalization_status=rec.normalization_status.value,
+                warnings=warnings, evidence_id=rec.evidence_id,
+            ))
+        elif isinstance(rec, CompanyProfile):
+            out["company_profiles"].append(repo.create_company_profile(
+                request_id=request_id, ticker_id=ticker_id, raw_response_id=raw.id,
+                company_name=rec.company_name, legal_name=rec.legal_name, sector=rec.sector,
+                industry=rec.industry, country=rec.country, exchange=rec.exchange,
+                currency=rec.currency, description=rec.description,
+                normalization_status=rec.normalization_status.value,
+                warnings=warnings, evidence_id=rec.evidence_id,
+            ))
+        elif isinstance(rec, FinancialMetric):
+            out["financial_metrics"].append(repo.create_financial_metric(
+                request_id=request_id, ticker_id=ticker_id, raw_response_id=raw.id,
+                metric_name=rec.metric_name,
+                metric_value=None if rec.metric_value is None else str(rec.metric_value),
+                period=rec.period, currency=rec.currency, unit=rec.unit,
+                source_name=rec.source_name, source_url=rec.source_url,
+                normalization_status=rec.normalization_status.value,
+                warnings=warnings, evidence_id=rec.evidence_id,
+            ))
+    return out
