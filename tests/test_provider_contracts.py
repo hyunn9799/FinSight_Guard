@@ -194,6 +194,7 @@ def test_all_mvp_contracts_are_clean():
 # Task 6 (T007): Normalization result containers + helper seams
 from src.providers.normalization import (
     NormalizationResult,
+    RawMarketData,
     RawNewsItem,
     normalize_news,
 )
@@ -288,3 +289,31 @@ def test_market_data_normalizes_to_reference_not_derived_results():
     assert res.normalized_market_data_ref is not None
     # market normalization MUST NOT emit technical/wave results
     assert res.records == []
+
+
+# Task 11 (T011): Degradation/status tests
+def test_failed_news_yields_insufficient_data():
+    res = normalize_news(
+        raw_items=[RawNewsItem(content="no title here")],
+        request_id="req1", ticker_id="tk1", raw_response_id="raw1",
+    )
+    assert res.status == NormalizationStatus.INSUFFICIENT_DATA
+    assert res.records == []
+    assert any(w.code == "missing_title" for w in res.warnings)
+
+
+def test_partial_news_missing_url_warns():
+    res = normalize_news(
+        raw_items=[RawNewsItem(title="Acme update")],
+        request_id="req1", ticker_id="tk1", raw_response_id="raw1",
+    )
+    assert res.status == NormalizationStatus.PARTIAL_SUCCESS
+    assert res.records[0].normalization_status == NormalizationStatus.PARTIAL_SUCCESS
+    assert any(w.code == "missing_url" for w in res.warnings)
+
+
+def test_empty_market_data_insufficient():
+    res = normalize_market_data(
+        raw=RawMarketData(candles=[]), request_id="req1", ticker_id="tk1", raw_response_id="raw1",
+    )
+    assert res.status == NormalizationStatus.INSUFFICIENT_DATA
