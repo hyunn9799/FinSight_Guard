@@ -68,10 +68,13 @@ Base commit before Task 1: 45a3fdd
 
 - Unit 22 (Plan Task 25, T037-T041/T047 FINAL VALIDATION GATE): complete (commit f8e3155). compile clean; 39/39 provider suites; 006 ruff surface clean; full suite 314/314. Lint fixes: mid-file imports relocated to top in 3 agent files + normalization.py + fixtures/provider_contracts.py; unused imports removed from test_provider_contracts.py (FORBIDDEN_TOKENS, FinancialProvider, MarketDataProvider, FinancialProviderResult, MarketDataProviderResult, UTC, datetime, raw_market_data fixture from second import), test_provider_graphrag_mapping_contracts.py (CompanyProfile), test_scenario_report_input_contract.py (CompanyProfile, NewsEvent, NormalizationStatus). test_storage_postgres_schema.py updated with US006_EXPECTED_TABLES to match new provider ORM tables. Pre-existing ruff issues (27 errors in backtest/graph/ux/storage files not touched by 006) left untouched. PHASE 6 (Polish) DONE. Review (Sonnet, b23c583..f8e3155): Spec ✅ + quality Approved — import relocations verified behavior-preserving, removed imports genuinely unused, schema test tightened not weakened, no 006 runtime logic altered.
 
-## ALL 22 UNITS COMPLETE — RESUME HERE
-- All implementation + per-unit reviews done. Branch = main..HEAD, 37 commits from merge-base 1a5e4b4.
-- NEXT: final whole-branch code review (most-capable model) → then superpowers:finishing-a-development-branch (PR/merge) — AWAITING USER GO.
-- OUTSTANDING housekeeping for finish: the plan file `docs/superpowers/plans/2026-06-22-provider-mcp-contracts.md` is still UNTRACKED — commit it (or intentionally exclude) when finishing. 27 pre-existing ruff errors in non-006 files remain (out of scope; document, do not fix here).
+## ALL 22 UNITS COMPLETE + FINAL REVIEW DONE — AWAITING USER GO TO MERGE
+- All implementation + per-unit reviews done. Plan file now committed to branch.
+- Final whole-branch review (Opus, 1a5e4b4..530a021): **READY TO MERGE = YES.** Critical 0, Important 0. All 5 accumulated Minors triaged ACCEPT. Surfaced 1 latent correctness bug + 1 defensive gap → both FIXED (commit b6f0f1f, review Spec ✅ + Approved):
+  - normalize_news per-item warning scoping (was leaking earlier items' warnings to later NewsEvents in multi-item batches) + 2-item regression test.
+  - persist_normalization now raises TypeError on unknown record types (was silent drop).
+- Verification: 40 provider-suite tests pass; full suite was 314/314 at Unit 22; migration round-trips clean; 006 ruff surface clean.
+- NEXT (AWAITING USER GO): superpowers:finishing-a-development-branch — PR to main or merge. 27 pre-existing ruff errors in non-006 files (backtest/graph/storage) remain out of scope.
 
 ## Minor findings (whole-branch review triage)
 - Unit 13: `AnalysisRepository` added to `src/db/repositories/__init__.py` export (not requested by brief; additive, non-breaking; reviewer accepted). Final review may keep or drop.
