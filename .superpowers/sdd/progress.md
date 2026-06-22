@@ -62,8 +62,10 @@ Base commit before Task 1: 45a3fdd
 
 - Unit 19 (Plan Task 22, T034 coordinator scenario boundary): complete (commit aa7b772; review Spec ✅ + quality Approved; 12/12 incl 9/9 coordinator no-regression). Additive boundary fn; import at top (no E402); exposes only normalized fields, no raw payloads. US3 (Phase 5) DONE.
 
+- Unit 20 (Plan Task 23, T046 full safety contract test): complete (commit 1ab93c7; review Spec ✅ + quality Approved; 3/3 passed). Structural sweep over all SAFETY_CHECKED_CONTRACTS (incl ScenarioReportInput) + token-matching pos/neg examples + instance check.
+
 ## RESUME HERE (next task)
-- Dispatch Unit 20 (Plan Task 23, T046 full safety contract test). Base = HEAD. Phase 6 polish. Then Unit 21 (Task 24, T035/T036 docs), Unit 22 (Task 25, T037-T041/T047 final validation gate — includes ruff: `uv pip install --python .venv/bin/python ruff` first, then relocate any mid-file imports + clear F401s).
+- Dispatch Unit 21 (Plan Task 24, T035/T036 docs: quickstart.md + PROJECT_PLAN.md). Base = HEAD. Then Unit 22 (Task 25, T037-T041/T047 final validation gate — includes ruff: `uv pip install --python .venv/bin/python ruff` first, then relocate any mid-file imports + clear F401s + full-suite regression).
 - NOTE: Runner `.venv/bin/python -m pytest` (NOT uv run); export DATABASE_URL + TEST_DATABASE_URL.
 
 ## Minor findings (whole-branch review triage)
