@@ -189,3 +189,29 @@ def test_all_mvp_contracts_are_clean():
     assert len(SAFETY_CHECKED_CONTRACTS) >= 5
     for contract in SAFETY_CHECKED_CONTRACTS:
         assert_no_trading_fields(contract)
+
+
+# Task 6 (T007): Normalization result containers + helper seams
+from src.providers.normalization import (
+    NormalizationResult,
+    RawNewsItem,
+    normalize_news,
+)
+
+
+def test_normalization_result_container_shape():
+    result = NormalizationResult(
+        status=NormalizationStatus.SUCCESS, records=[], warnings=[], errors=[]
+    )
+    assert result.records == []
+
+
+def test_normalize_news_signature_exists_but_unimplemented():
+    # US1 (T012) implements the body; here we only assert the seam exists.
+    with pytest.raises(NotImplementedError):
+        normalize_news(
+            raw_items=[RawNewsItem(headline="x")],
+            request_id="req1",
+            ticker_id="tk1",
+            raw_response_id="raw1",
+        )
