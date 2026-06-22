@@ -403,3 +403,106 @@ class PortfolioItem(UUIDMixin, TimestampMixin, Base):
     cost_basis_note: Mapped[str | None] = mapped_column(String, nullable=True)
     item_metadata: Mapped[dict] = mapped_column("metadata", JSONB, default=dict, nullable=False)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+# ---------------------------------------------------------------------------
+# 006: Provider-agnostic MCP contract records (US2 extension — additive only)
+# ---------------------------------------------------------------------------
+
+
+class RawProviderResponse(UUIDMixin, TimestampMixin, Base):
+    __tablename__ = "raw_provider_responses"
+    request_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("analysis_requests.id"), nullable=False)
+    ticker_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tickers.id"), nullable=False)
+    provider_name: Mapped[str] = mapped_column(String, nullable=False)
+    provider_kind: Mapped[str] = mapped_column(String, nullable=False)  # news/financial/market_data
+    provider_request: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    collected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    payload_ref: Mapped[str | None] = mapped_column(String, nullable=True)
+    payload_body: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    payload_hash: Mapped[str | None] = mapped_column(String, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    provider_metadata: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+
+
+class ProviderCompanyProfile(UUIDMixin, TimestampMixin, Base):
+    __tablename__ = "provider_company_profiles"
+    request_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("analysis_requests.id"), nullable=False)
+    ticker_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tickers.id"), nullable=False)
+    raw_response_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("raw_provider_responses.id"), nullable=False)
+    company_name: Mapped[str] = mapped_column(String, nullable=False)
+    legal_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    sector: Mapped[str | None] = mapped_column(String, nullable=True)
+    industry: Mapped[str | None] = mapped_column(String, nullable=True)
+    country: Mapped[str | None] = mapped_column(String, nullable=True)
+    exchange: Mapped[str | None] = mapped_column(String, nullable=True)
+    currency: Mapped[str | None] = mapped_column(String, nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    normalization_status: Mapped[str] = mapped_column(String, nullable=False)
+    warnings: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
+    evidence_id: Mapped[str | None] = mapped_column(String, nullable=True)
+
+
+class ProviderNewsEvent(UUIDMixin, TimestampMixin, Base):
+    __tablename__ = "provider_news_events"
+    request_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("analysis_requests.id"), nullable=False)
+    ticker_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tickers.id"), nullable=False)
+    raw_response_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("raw_provider_responses.id"), nullable=False)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    source_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    event_type: Mapped[str | None] = mapped_column(String, nullable=True)
+    sentiment_label: Mapped[str | None] = mapped_column(String, nullable=True)
+    risk_tags: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
+    normalization_status: Mapped[str] = mapped_column(String, nullable=False)
+    warnings: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
+    evidence_id: Mapped[str | None] = mapped_column(String, nullable=True)
+
+
+class ProviderFinancialMetric(UUIDMixin, TimestampMixin, Base):
+    __tablename__ = "provider_financial_metrics"
+    request_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("analysis_requests.id"), nullable=False)
+    ticker_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tickers.id"), nullable=False)
+    raw_response_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("raw_provider_responses.id"), nullable=False)
+    metric_name: Mapped[str] = mapped_column(String, nullable=False)
+    metric_value: Mapped[str | None] = mapped_column(String, nullable=True)  # stringified; numeric kept in JSONB metadata if needed
+    period: Mapped[str | None] = mapped_column(String, nullable=True)
+    currency: Mapped[str | None] = mapped_column(String, nullable=True)
+    unit: Mapped[str | None] = mapped_column(String, nullable=True)
+    source_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    source_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    normalization_status: Mapped[str] = mapped_column(String, nullable=False)
+    warnings: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
+    evidence_id: Mapped[str | None] = mapped_column(String, nullable=True)
+
+
+class ProviderTechnicalAnalysisResult(UUIDMixin, TimestampMixin, Base):
+    __tablename__ = "provider_technical_analysis_results"
+    request_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("analysis_requests.id"), nullable=False)
+    ticker_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tickers.id"), nullable=False)
+    source_market_data_refs: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
+    indicator_values: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    trend_state: Mapped[str | None] = mapped_column(String, nullable=True)
+    momentum_state: Mapped[str | None] = mapped_column(String, nullable=True)
+    volatility_state: Mapped[str | None] = mapped_column(String, nullable=True)
+    normalization_status: Mapped[str] = mapped_column(String, nullable=False)
+    warnings: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
+    evidence_ids: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
+
+
+class ProviderWaveAnalysisResult(UUIDMixin, TimestampMixin, Base):
+    __tablename__ = "provider_wave_analysis_results"
+    request_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("analysis_requests.id"), nullable=False)
+    ticker_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tickers.id"), nullable=False)
+    source_market_data_refs: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
+    rule_refs: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
+    candidate_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    rule_statuses: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    confirmation_conditions: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
+    invalidation_conditions: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
+    uncertainty_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    warnings: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
+    evidence_ids: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
