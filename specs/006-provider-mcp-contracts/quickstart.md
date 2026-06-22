@@ -15,23 +15,30 @@ mapping without live MCP calls.
 
 ## Validation Commands
 
-```bash
-python -m compileall src
-pytest tests/test_provider_contracts.py
-pytest tests/test_provider_persistence_contracts.py
-pytest tests/test_provider_graphrag_mapping_contracts.py
-pytest tests/test_scenario_report_input_contract.py
-```
-
-If the project uses `uv`:
+This repository has no `pyproject.toml`. Use the virtual-environment runner directly:
 
 ```bash
-uv run python -m compileall src
-uv run pytest tests/test_provider_contracts.py
-uv run pytest tests/test_provider_persistence_contracts.py
-uv run pytest tests/test_provider_graphrag_mapping_contracts.py
-uv run pytest tests/test_scenario_report_input_contract.py
+# Compile check
+.venv/bin/python -m compileall -q src
+
+# Lint
+.venv/bin/python -m ruff check src tests
+
+# Contract test suite
+.venv/bin/python -m pytest tests/test_provider_contracts.py
+.venv/bin/python -m pytest tests/test_provider_persistence_contracts.py
+.venv/bin/python -m pytest tests/test_provider_graphrag_mapping_contracts.py
+.venv/bin/python -m pytest tests/test_scenario_report_input_contract.py
+.venv/bin/python -m pytest tests/test_provider_observability_contract.py
+.venv/bin/python -m pytest tests/test_provider_safety_contract.py
 ```
+
+> **Note:** `tests/test_provider_persistence_contracts.py` requires a live PostgreSQL
+> database. Without it the tests are automatically skipped. To enable them, export:
+>
+> ```bash
+> export TEST_DATABASE_URL=postgresql+psycopg://finsight:finsight@localhost:5432/finsight_test
+> ```
 
 ## Scenario 1: Provider Shape Independence
 
@@ -78,3 +85,32 @@ Expected:
 - Failed or missing categories create missing-data notes.
 - ScenarioReportInput is either degraded with warnings or insufficient_data.
 - No facts or graph relationships are fabricated.
+
+## Validation results
+
+The canonical validation set for feature 006 consists of the following six test modules:
+
+| Test file | Coverage area |
+|---|---|
+| `tests/test_provider_contracts.py` | Core normalization boundary (CompanyProfile, FinancialMetric, NewsEvent, MarketData) |
+| `tests/test_provider_persistence_contracts.py` | ORM round-trip and Alembic migration; requires `TEST_DATABASE_URL` (skipped otherwise) |
+| `tests/test_provider_graphrag_mapping_contracts.py` | Graph-mapping eligibility; raw responses excluded from projection |
+| `tests/test_scenario_report_input_contract.py` | ScenarioReportInput assembly from normalized contracts |
+| `tests/test_provider_observability_contract.py` | Observability fields (provider, fetched_at, latency_ms) present on all contract types |
+| `tests/test_provider_safety_contract.py` | Safety invariants: no PII, no fabricated facts, boundary not crossed |
+
+To run the full validation suite against this environment:
+
+```bash
+.venv/bin/python -m compileall -q src
+.venv/bin/python -m ruff check src tests
+.venv/bin/python -m pytest tests/test_provider_contracts.py \
+    tests/test_provider_persistence_contracts.py \
+    tests/test_provider_graphrag_mapping_contracts.py \
+    tests/test_scenario_report_input_contract.py \
+    tests/test_provider_observability_contract.py \
+    tests/test_provider_safety_contract.py
+```
+
+Persistence tests skip automatically when `TEST_DATABASE_URL` is not set; all other
+tests run without any external service.

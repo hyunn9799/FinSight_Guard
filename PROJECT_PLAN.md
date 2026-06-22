@@ -104,7 +104,27 @@ The project is considered complete when all the following conditions are met:
 
 ---
 
-<!-- # 7. Codex 프롬프트 1 — 전체 설계 업그레이드
+## 7. 006 Provider Contract Boundary
+
+Feature branch 006 establishes the provider-agnostic MCP contract layer. Ownership is
+split across three feature units:
+
+*   **006 — contracts and mapping:** Defines normalized contract types
+    (CompanyProfile, FinancialMetric, NewsEvent, MarketData, TechnicalAnalysisResult,
+    WaveAnalysisResult, RiskAssessment, EvidenceItem), the normalization boundary
+    (raw provider responses must not cross into agent logic), and the GraphRAG mapping
+    spec that feeds the 005 graph model.
+*   **004 — canonical tables:** Owns the underlying database schema. The provider
+    contract records introduced by 006 are persisted via Alembic migration
+    `8f1a2b3c4d5e` (down_revision `56464a69bd55`), which extends the 004 schema
+    without replacing it.
+*   **005 — graph semantics:** Owns the graph node/edge model. The 006 mapping
+    contract produces graph-eligible specs for 005 to consume; raw provider payloads
+    are never projected directly into the graph.
+
+---
+
+<!-- # 8. Codex 프롬프트 1 — 전체 설계 업그레이드
 
 첫 프롬프트는 이걸 써.
 
