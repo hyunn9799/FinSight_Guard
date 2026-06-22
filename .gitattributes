@@ -1,0 +1,4 @@
+# Treat the vendored gstack plugin/skills as third-party tooling so GitHub
+# Linguist excludes them from the repository's language statistics and diffs.
+# These files are not part of the FinSight Guard application source.
+.claude/** linguist-vendored
