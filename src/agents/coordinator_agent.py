@@ -5,6 +5,7 @@ from datetime import date
 from src.evidence.evidence_schema import EvidenceItem
 from src.graph.state import GraphState, ResearchReport, WorkflowError
 from src.graph_rag.graph_schema import GraphContext, GraphEdge
+from src.providers.scenario_input import ScenarioReportInput
 from src.safety.forbidden_phrases import REQUIRED_DISCLAIMER
 
 
@@ -490,4 +491,22 @@ def run_coordinator_agent(state: GraphState) -> dict:
     return {
         "status": "success",
         "draft_report": report,
+    }
+
+
+def scenario_report_input_to_agent_input(sri: ScenarioReportInput) -> dict:
+    """Adapt ScenarioReportInput for the Coordinator (ScenarioAgent role).
+
+    Exposes only normalized contract fields; never raw provider payloads.
+    """
+    return {
+        "request_id": sri.request_id,
+        "ticker": sri.ticker,
+        "company_name": sri.company_profile.company_name if sri.company_profile else None,
+        "news_count": len(sri.news_events),
+        "metric_names": [m.metric_name for m in sri.financial_metrics],
+        "evidence_ids": sri.evidence_ids,
+        "missing_data_notes": sri.missing_data_notes,
+        "degradation_status": sri.degradation_status.value,
+        "warning_count": len(sri.warnings),
     }

@@ -161,3 +161,21 @@ def build_evidence_path_spec(graph_context: GraphContext) -> dict | None:
             for edge in grounded
         ],
     }
+
+
+def build_contract_graph_context(specs, *, projection_status: str = "ready") -> dict:
+    """Build a 006-boundary graph context from eligibility specs.
+
+    Does not call Neo4j; reflects projection status into degraded/warnings so
+    ScenarioReportInput can disclose missing/stale graph context (FR-015, SER-006).
+    """
+    degraded = projection_status != "ready"
+    warnings: list[str] = []
+    if degraded:
+        warnings.append(f"graph projection {projection_status}: context missing or stale")
+    nodes = [
+        {"node_type": s.graph_node_type, "canonical_ref": s.source_canonical_ref,
+         "evidence_ref": s.evidence_ref}
+        for s in specs
+    ]
+    return {"nodes": nodes, "degraded": degraded, "warnings": warnings}

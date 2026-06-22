@@ -6,6 +6,7 @@ from typing import Any
 from src.evidence.evidence_builder import build_news_evidence
 from src.evidence.evidence_schema import EvidenceItem
 from src.graph.state import GraphState, NewsAnalysis, WorkflowError
+from src.providers.entities import NewsEvent as ContractNewsEvent
 from src.tools.news_search import search_recent_news
 
 
@@ -235,4 +236,17 @@ def run_news_agent(state: GraphState) -> dict:
         "status": "success",
         "news_analysis": analysis,
         "evidence": [*state.get("evidence", []), *evidence],
+    }
+
+
+def news_events_to_agent_input(events: list[ContractNewsEvent]) -> dict:
+    """Adapt normalized NewsEvent contracts into NewsAgent's analysis input.
+
+    Reads only contract fields — never provider-specific raw payload keys.
+    """
+    return {
+        "count": len(events),
+        "titles": [e.title for e in events],
+        "summaries": [e.summary for e in events if e.summary],
+        "risk_tags": sorted({t for e in events for t in e.risk_tags}),
     }

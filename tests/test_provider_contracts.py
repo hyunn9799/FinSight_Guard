@@ -1,0 +1,359 @@
+"""User Story 1 contract tests (deterministic, no live calls)."""
+
+import pytest
+from pydantic import BaseModel, ValidationError
+
+from src.agents.fundamental_agent import fundamentals_to_agent_input
+from src.agents.market_agent import market_inputs_to_agent_input
+from src.agents.news_agent import news_events_to_agent_input
+from src.providers.entities import (
+    CompanyProfile,
+    FinancialMetric,
+    NewsEvent,
+    TechnicalAnalysisResult,
+    WaveAnalysisResult,
+)
+from src.providers.enums import (
+    DegradationStatus,
+    NormalizationStatus,
+    ProviderKind,
+    RawResponseRef,
+    RuleStatus,
+    Warning,
+)
+from src.providers.interfaces import (
+    NewsProvider,
+    NewsProviderResult,
+)
+from src.providers.normalization import (
+    NormalizationResult,
+    RawMarketData,
+    RawNewsItem,
+    normalize_company,
+    normalize_financials,
+    normalize_market_data,
+    normalize_news,
+)
+from src.providers.safety import (
+    SAFETY_CHECKED_CONTRACTS,
+    assert_no_trading_fields,
+    find_trading_fields,
+)
+from tests.fixtures.provider_contracts import (
+    raw_company_payload,
+    raw_financial_rows,
+    raw_market_data,
+    raw_news_provider_a,
+    raw_news_provider_b,
+)
+
+
+def test_enums_have_required_members():
+    assert ProviderKind.NEWS.value == "news"
+    assert ProviderKind.FINANCIAL.value == "financial"
+    assert ProviderKind.MARKET_DATA.value == "market_data"
+    assert NormalizationStatus.SUCCESS.value == "success"
+    assert NormalizationStatus.PARTIAL_SUCCESS.value == "partial_success"
+    assert NormalizationStatus.DEGRADED.value == "degraded"
+    assert NormalizationStatus.FAILED.value == "failed"
+    assert NormalizationStatus.UNSUPPORTED_FIELD.value == "unsupported_field"
+    assert NormalizationStatus.INSUFFICIENT_DATA.value == "insufficient_data"
+    assert DegradationStatus.COMPLETE.value == "complete"
+    assert DegradationStatus.INSUFFICIENT_DATA.value == "insufficient_data"
+
+
+def test_lineage_ref_forbids_extra_fields():
+    RawResponseRef(raw_response_id="r1")
+    with pytest.raises(ValidationError):
+        RawResponseRef(raw_response_id="r1", bogus="x")
+
+
+def test_warning_is_structured():
+    w = Warning(code="missing_url", message="news event has no source url")
+    assert w.code == "missing_url"
+
+
+# Task 3 (T006): Normalized & derived entity contracts
+def test_news_event_minimal_and_forbids_extra():
+    ev = NewsEvent(
+        request_id="req1",
+        ticker_id="tk1",
+        raw_response_id="raw1",
+        title="Acme beats earnings",
+        normalization_status=NormalizationStatus.SUCCESS,
+    )
+    assert ev.title == "Acme beats earnings"
+    assert ev.warnings == []
+    with pytest.raises(ValidationError):
+        NewsEvent(
+            request_id="req1",
+            ticker_id="tk1",
+            raw_response_id="raw1",
+            title="x",
+            normalization_status=NormalizationStatus.SUCCESS,
+            content="RAW PROVIDER FIELD",  # not in contract -> rejected
+        )
+
+
+def test_derived_results_trace_to_market_data_not_raw():
+    tar = TechnicalAnalysisResult(
+        request_id="req1",
+        ticker_id="tk1",
+        source_market_data_refs=["md1"],
+        indicator_values={"rsi_14": 55.0},
+        normalization_or_derivation_status=NormalizationStatus.SUCCESS,
+    )
+    assert tar.source_market_data_refs == ["md1"]
+    # derived contract has no raw_response_id field at all
+    assert "raw_response_id" not in TechnicalAnalysisResult.model_fields
+
+    war = WaveAnalysisResult(
+        request_id="req1",
+        ticker_id="tk1",
+        source_market_data_refs=["md1"],
+        rule_refs=["rule_neowave_1"],
+        rule_statuses={"rule_neowave_1": RuleStatus.NEEDS_HUMAN_REVIEW},
+    )
+    assert war.rule_statuses["rule_neowave_1"] is RuleStatus.NEEDS_HUMAN_REVIEW
+
+
+def test_company_and_financial_profiles():
+    cp = CompanyProfile(
+        request_id="req1", ticker_id="tk1", raw_response_id="raw1",
+        company_name="Acme Corp", normalization_status=NormalizationStatus.SUCCESS,
+    )
+    assert cp.sector is None
+    fm = FinancialMetric(
+        request_id="req1", ticker_id="tk1", raw_response_id="raw1",
+        metric_name="revenue", metric_value=1234.5, period="FY2025",
+        normalization_status=NormalizationStatus.SUCCESS,
+    )
+    assert fm.metric_value == 1234.5
+
+
+# Task 4 (T005): Provider interface Protocols + result models
+def test_provider_results_carry_normalized_objects_only():
+    res = NewsProviderResult(
+        raw_response_ref="raw1",
+        normalization_status=NormalizationStatus.SUCCESS,
+        news_events=[],
+    )
+    assert res.news_events == []
+    assert res.warnings == []
+    # result must not allow a raw payload field
+    with pytest.raises(ValidationError):
+        NewsProviderResult(
+            raw_response_ref="raw1",
+            normalization_status=NormalizationStatus.SUCCESS,
+            news_events=[],
+            payload_body={"x": 1},
+        )
+
+
+def test_protocols_are_runtime_checkable():
+    class _FakeNews:
+        def fetch_news(self, request):  # noqa: ANN001
+            return NewsProviderResult(
+                raw_response_ref="raw1",
+                normalization_status=NormalizationStatus.SUCCESS,
+                news_events=[],
+            )
+
+    assert isinstance(_FakeNews(), NewsProvider)
+
+
+# Task 5 (T048): Token-based no-trading-field safety contract
+def test_token_matching_rejects_trading_field_names():
+    class Bad(BaseModel):
+        buy_signal: int = 0
+
+    class Bad2(BaseModel):
+        target_price: float = 0.0
+
+    class Bad3(BaseModel):
+        order_action: str = ""
+
+    for m in (Bad, Bad2, Bad3):
+        assert find_trading_fields(m), f"{m.__name__} should be flagged"
+        with pytest.raises(ValueError):
+            assert_no_trading_fields(m)
+
+
+def test_substrings_do_not_false_positive():
+    class Ok(BaseModel):
+        threshold: float = 0.0   # contains "hold" as substring -> must NOT match
+        household_count: int = 0  # token "household" != "hold"
+        metric_name: str = ""     # value could be "price"; names are clean
+
+    assert find_trading_fields(Ok) == []
+    assert_no_trading_fields(Ok)  # no raise
+
+
+def test_all_mvp_contracts_are_clean():
+    assert len(SAFETY_CHECKED_CONTRACTS) >= 5
+    for contract in SAFETY_CHECKED_CONTRACTS:
+        assert_no_trading_fields(contract)
+
+
+# Task 6 (T007): Normalization result containers + helper seams
+def test_normalization_result_container_shape():
+    result = NormalizationResult(
+        status=NormalizationStatus.SUCCESS, records=[], warnings=[], errors=[]
+    )
+    assert result.records == []
+
+
+def test_normalize_news_handles_incomplete_item():
+    # US1 (T012) implements the body; verify it handles minimal input.
+    result = normalize_news(
+        raw_items=[RawNewsItem(headline="x")],
+        request_id="req1",
+        ticker_id="tk1",
+        raw_response_id="raw1",
+    )
+    assert result.status == NormalizationStatus.PARTIAL_SUCCESS
+    assert len(result.records) == 1
+    assert result.records[0].title == "x"
+
+
+# Task 7 (T008): Stable public exports
+def test_public_exports_are_stable():
+    import src.providers as p
+
+    for name in (
+        "CompanyProfile", "NewsEvent", "FinancialMetric",
+        "TechnicalAnalysisResult", "WaveAnalysisResult",
+        "NewsProvider", "FinancialProvider", "MarketDataProvider",
+        "NormalizationStatus", "DegradationStatus",
+        "normalize_news", "normalize_company", "normalize_financials",
+        "normalize_market_data",
+        "assert_no_trading_fields", "SAFETY_CHECKED_CONTRACTS",
+    ):
+        assert hasattr(p, name), f"missing export: {name}"
+
+
+# Task 8 (T009/T012): Two-shape news normalization with fixtures
+def test_equivalent_news_shapes_normalize_identically():
+    common = dict(request_id="req1", ticker_id="tk1", raw_response_id="raw1")
+    res_a = normalize_news(raw_items=raw_news_provider_a(), **common)
+    res_b = normalize_news(raw_items=raw_news_provider_b(), **common)
+
+    assert res_a.status == NormalizationStatus.SUCCESS
+    assert res_b.status == NormalizationStatus.SUCCESS
+    assert [type(r) for r in res_a.records] == [NewsEvent]
+    assert [type(r) for r in res_b.records] == [NewsEvent]
+
+    a, b = res_a.records[0], res_b.records[0]
+    assert a.title == b.title == "Acme beats Q2 earnings"
+    assert a.summary == b.summary
+    assert a.source_url == b.source_url
+    # no provider-specific raw field leaks onto the contract:
+    assert "content" not in NewsEvent.model_fields
+    assert "headline" not in NewsEvent.model_fields
+
+
+# Task 9 (T010/T013/T014): Company/financial/market fixtures and normalizers
+def test_company_and_financial_boundary_preserved():
+    common = dict(request_id="req1", ticker_id="tk1", raw_response_id="raw1")
+    cres = normalize_company(raw=raw_company_payload(), **common)
+    fres = normalize_financials(raw_rows=raw_financial_rows(), **common)
+
+    assert [type(r) for r in cres.records] == [CompanyProfile]
+    assert cres.records[0].company_name == "Acme Corp"
+    assert all(type(r) is FinancialMetric for r in fres.records)
+    assert {r.metric_name for r in fres.records} == {"revenue", "net_income"}
+    # all normalized records trace to the raw response:
+    assert cres.records[0].raw_response_id == "raw1"
+    assert all(r.raw_response_id == "raw1" for r in fres.records)
+
+
+def test_market_data_normalizes_to_reference_not_derived_results():
+    res = normalize_market_data(
+        raw=raw_market_data(), request_id="req1", ticker_id="tk1", raw_response_id="raw1",
+    )
+    assert res.status == NormalizationStatus.SUCCESS
+    assert res.normalized_market_data_ref is not None
+    # market normalization MUST NOT emit technical/wave results
+    assert res.records == []
+
+
+# Task 11 (T011): Degradation/status tests
+def test_failed_news_yields_insufficient_data():
+    res = normalize_news(
+        raw_items=[RawNewsItem(content="no title here")],
+        request_id="req1", ticker_id="tk1", raw_response_id="raw1",
+    )
+    assert res.status == NormalizationStatus.INSUFFICIENT_DATA
+    assert res.records == []
+    assert any(w.code == "missing_title" for w in res.warnings)
+
+
+def test_partial_news_missing_url_warns():
+    res = normalize_news(
+        raw_items=[RawNewsItem(title="Acme update")],
+        request_id="req1", ticker_id="tk1", raw_response_id="raw1",
+    )
+    assert res.status == NormalizationStatus.PARTIAL_SUCCESS
+    assert res.records[0].normalization_status == NormalizationStatus.PARTIAL_SUCCESS
+    assert any(w.code == "missing_url" for w in res.warnings)
+
+
+def test_empty_market_data_insufficient():
+    res = normalize_market_data(
+        raw=RawMarketData(candles=[]), request_id="req1", ticker_id="tk1", raw_response_id="raw1",
+    )
+    assert res.status == NormalizationStatus.INSUFFICIENT_DATA
+
+
+# Task 12 (T015/T016/T017): Agent boundary functions consuming normalized contracts
+def test_news_agent_boundary_consumes_contracts_only():
+    res = normalize_news(
+        raw_items=raw_news_provider_a(), request_id="req1", ticker_id="tk1", raw_response_id="raw1",
+    )
+    agent_input = news_events_to_agent_input(res.records)
+    assert agent_input["count"] == 1
+    assert agent_input["titles"] == ["Acme beats Q2 earnings"]
+    # no raw provider keys present
+    assert "content" not in agent_input and "headline" not in agent_input
+
+
+def test_fundamental_agent_boundary():
+    common = dict(request_id="req1", ticker_id="tk1", raw_response_id="raw1")
+    cp = normalize_company(raw=raw_company_payload(), **common).records[0]
+    metrics = normalize_financials(raw_rows=raw_financial_rows(), **common).records
+    agent_input = fundamentals_to_agent_input(cp, metrics)
+    assert agent_input["company_name"] == "Acme Corp"
+    assert agent_input["metrics"]["revenue"] == 1234.5
+
+
+def test_normalize_news_warnings_scoped_per_item():
+    # Regression: item 2 (with source_url) must NOT inherit item 1's missing_url warning.
+    # Item 1: Provider-A style — title+content, no url.
+    # Item 2: Provider-B style — headline+summary_text+source_url.
+    items = [
+        RawNewsItem(title="Item without URL", content="body text"),
+        RawNewsItem(headline="Item with URL", summary_text="summary", source_url="https://example.com/news/1"),
+    ]
+    result = normalize_news(
+        raw_items=items, request_id="req1", ticker_id="tk1", raw_response_id="raw1",
+    )
+    assert len(result.records) == 2, "both items must produce a NewsEvent"
+    rec0, rec1 = result.records
+    assert len(rec0.warnings) == 1
+    assert rec0.warnings[0].code == "missing_url"
+    assert rec1.warnings == [], "item with source_url must NOT inherit item 1's warning"
+    # result-level aggregate still carries the warning
+    assert any(w.code == "missing_url" for w in result.warnings), "aggregate warning must be preserved"
+    assert result.status == NormalizationStatus.PARTIAL_SUCCESS
+
+
+def test_market_agent_keeps_provider_data_separate_from_derived():
+    md_ref = "md::req1::tk1::raw1"
+    derived = [TechnicalAnalysisResult(
+        request_id="req1", ticker_id="tk1", source_market_data_refs=[md_ref],
+        indicator_values={"rsi_14": 55.0},
+        normalization_or_derivation_status=NormalizationStatus.SUCCESS,
+    )]
+    agent_input = market_inputs_to_agent_input(market_data_ref=md_ref, technical_results=derived)
+    assert agent_input["market_data_ref"] == md_ref
+    assert agent_input["technical"][0]["indicator_values"]["rsi_14"] == 55.0
