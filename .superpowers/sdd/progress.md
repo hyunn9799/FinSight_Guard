@@ -60,8 +60,10 @@ Base commit before Task 1: 45a3fdd
 
 - Unit 18 (Plan Task 21, T033 build_contract_graph_context): complete (commit 00a0b16; review Spec ✅ + quality Approved; 3/3 passed). Pure boundary fn, no Neo4j; reflects projection_status into degraded/warnings.
 
+- Unit 19 (Plan Task 22, T034 coordinator scenario boundary): complete (commit aa7b772; review Spec ✅ + quality Approved; 12/12 incl 9/9 coordinator no-regression). Additive boundary fn; import at top (no E402); exposes only normalized fields, no raw payloads. US3 (Phase 5) DONE.
+
 ## RESUME HERE (next task)
-- Dispatch Unit 19 (Plan Task 22, T034 coordinator scenario boundary). Base = HEAD. CRITICAL: `from src.providers.scenario_input import ScenarioReportInput` MUST go at TOP of coordinator_agent.py (E402) — brief shows it mid-file. After Unit 19, US3 (Phase 5) DONE → Phase 6 polish (Units 20-22).
+- Dispatch Unit 20 (Plan Task 23, T046 full safety contract test). Base = HEAD. Phase 6 polish. Then Unit 21 (Task 24, T035/T036 docs), Unit 22 (Task 25, T037-T041/T047 final validation gate — includes ruff: `uv pip install --python .venv/bin/python ruff` first, then relocate any mid-file imports + clear F401s).
 - NOTE: Runner `.venv/bin/python -m pytest` (NOT uv run); export DATABASE_URL + TEST_DATABASE_URL.
 
 ## Minor findings (whole-branch review triage)
