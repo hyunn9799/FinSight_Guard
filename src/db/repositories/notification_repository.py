@@ -1,9 +1,30 @@
 """Repository for in-app notifications (US3). App-internal only — no external delivery."""
 
 from datetime import UTC, datetime
+from typing import Any
 
 from src.db.models import Notification
 from src.db.repositories.base import BaseRepository
+from src.safety.safety_checker import find_forbidden_phrases
+
+
+def _payload_text(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        return "\n".join(_payload_text(item) for item in value.values())
+    if isinstance(value, list | tuple | set):
+        return "\n".join(_payload_text(item) for item in value)
+    return str(value)
+
+
+def _assert_notification_safe(*, title: str, body: str, payload: dict | None) -> None:
+    text = "\n".join([title, body, _payload_text(payload)])
+    matches = find_forbidden_phrases(text)
+    if matches:
+        raise ValueError(f"Notification contains forbidden financial advice phrase: {matches[0]}")
 
 
 class NotificationRepository(BaseRepository):
@@ -18,6 +39,7 @@ class NotificationRepository(BaseRepository):
         user_id=None,
         ticker_id=None,
     ) -> Notification:
+        _assert_notification_safe(title=title, body=body, payload=payload)
         note = Notification(
             user_id=user_id,
             ticker_id=ticker_id,

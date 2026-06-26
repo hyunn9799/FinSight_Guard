@@ -16,6 +16,10 @@ depend on live external APIs.
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
+**학습 규칙**: tasks를 만들기 전에 작업을 어떻게 나눌지에 대한 판단을
+먼저 설명한다. 구현 단계에서는 사용자가 명시한 task 범위만 실행하며,
+기본값으로 전체 tasks.md를 실행하지 않는다.
+
 ## Format: `[ID] [P?] [Story] Description`
 
 - **[P]**: Can run in parallel (different files, no dependencies)
@@ -28,6 +32,24 @@ depend on live external APIs.
 - **Web app**: `backend/src/`, `frontend/src/`
 - **Mobile**: `api/src/`, `ios/src/` or `android/src/`
 - Paths shown below assume single project - adjust based on plan.md structure
+
+## 학습 단계 브리핑
+
+<!--
+  필수 작성: tasks.md를 채우기 전에 작업을 어떻게 묶을지, 어떤 의존성이
+  구현을 막는지, 어떤 테스트가 필요한지, 남은 assumptions가 무엇인지,
+  어떤 파일이 변경될 것으로 예상되는지 설명한다.
+-->
+
+**이번 단계의 목적**: [학습자가 이 task 분해를 왜 읽어야 하는지 설명]
+
+**이번 단계에서 확인할 판단**:
+- [Phase 경계 결정]
+- [User story 단위 분할 결정]
+- [테스트 우선순위와 검증 방식 결정]
+
+**Assumptions**:
+- [애매한 요구사항을 임의로 확정하지 말고 assumptions로 기록]
 
 <!--
   ============================================================================
@@ -266,3 +288,16 @@ With multiple developers:
 - Commit after each task or logical group
 - Stop at any checkpoint to validate story independently
 - Avoid: vague tasks, same file conflicts, cross-story dependencies that break independence
+
+## 단계 완료 리뷰
+
+<!--
+  필수 작성: tasks.md를 만들거나 수정한 뒤 학습 관점의 결과를 요약한다.
+-->
+
+- **이번 단계의 목적**: [이 단계에서 실행 가능하게 만들려던 것]
+- **새로 생긴 파일 또는 변경된 파일**: [생성/수정 파일]
+- **핵심 설계 결정**: [결정 목록]
+- **검토한 task 묶음 대안**: [대안과 절충점]
+- **현재 task 구조를 선택한 이유**: [선택 근거]
+- **반드시 읽어야 할 부분**: [학습자가 확인할 구체적인 섹션]
