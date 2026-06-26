@@ -8,6 +8,24 @@
 
 **Input**: User description: "$ARGUMENTS"
 
+## 학습 단계 브리핑
+
+<!--
+  필수 작성: spec을 쓰기 전에 이번 단계에서 무엇을 결정할지 먼저 설명한다.
+  사용자 가치, 범위 경계, safety/evidence 영향, 불명확한 요구사항,
+  assumptions를 포함한다. 이 단계에서는 코드를 구현하지 않는다.
+-->
+
+**이번 단계의 목적**: [학습자가 이 spec을 왜 읽어야 하는지 설명]
+
+**이번 단계에서 확인할 판단**:
+- [사용자/문제 경계 결정]
+- [기능 범위 결정]
+- [안전성, evidence, 실패 모드, 관측성 관련 결정]
+
+**Assumptions**:
+- [애매한 요구사항을 임의로 확정하지 말고 assumptions로 기록]
+
 ## User Scenarios & Testing *(mandatory)*
 
 <!--
@@ -141,9 +159,24 @@
   ACTION REQUIRED: The content in this section represents placeholders.
   Fill them out with the right assumptions based on reasonable defaults
   chosen when the feature description did not specify certain details.
+  애매한 부분이 진행을 막거나 위험도가 높다면 assumption으로 넘기지 말고
+  먼저 질문한다.
 -->
 
 - [Assumption about target users, e.g., "Users have stable internet connectivity"]
 - [Assumption about scope boundaries, e.g., "Mobile support is out of scope for v1"]
 - [Assumption about data/environment, e.g., "Existing authentication system will be reused"]
 - [Dependency on existing system/service, e.g., "Requires access to the existing user profile API"]
+
+## 단계 완료 리뷰
+
+<!--
+  필수 작성: spec을 만들거나 수정한 뒤 학습 관점의 결과를 요약한다.
+-->
+
+- **이번 단계의 목적**: [이 단계에서 명확히 하려던 것]
+- **새로 생긴 파일 또는 변경된 파일**: [생성/수정 파일]
+- **핵심 설계 결정**: [결정 목록]
+- **검토한 대안**: [대안과 절충점]
+- **현재 설계를 선택한 이유**: [선택 근거]
+- **반드시 읽어야 할 부분**: [학습자가 확인할 구체적인 섹션]

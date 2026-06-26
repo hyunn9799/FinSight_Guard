@@ -105,6 +105,32 @@ def test_notification_list_filters_status_and_excludes_deleted(db_session):
 
 
 @REQUIRES_DB
+def test_notification_rejects_forbidden_financial_advice_phrases(db_session):
+    from src.db.repositories.notification_repository import NotificationRepository
+
+    repo = NotificationRepository(db_session)
+    user = make_user(db_session)
+
+    with pytest.raises(ValueError, match="강력 매수"):
+        repo.create(
+            notification_type="unsafe",
+            title="분석 알림",
+            body="이 종목은 강력 매수 대상입니다.",
+            payload={"note": "교육용 알림"},
+            user_id=user.id,
+        )
+
+    with pytest.raises(ValueError, match="수익 보장"):
+        repo.create(
+            notification_type="unsafe",
+            title="분석 알림",
+            body="교육용 알림",
+            payload={"nested": {"message": "수익 보장 표현은 금지"}},
+            user_id=user.id,
+        )
+
+
+@REQUIRES_DB
 def test_portfolio_with_items_is_research_only(db_session):
     from src.db.repositories.portfolio_repository import PortfolioRepository
 

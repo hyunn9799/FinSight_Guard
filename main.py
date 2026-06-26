@@ -221,6 +221,7 @@ def backtest(request: BacktestRequest) -> dict[str, Any]:
         "backtest_analysis": result.get("backtest_analysis"),
         "report_path": result.get("report_path"),
         "errors": result.get("errors", []),
+        "request_id": (str(result["request_id"]) if result.get("request_id") else None),
     }
     return jsonable_encoder(response)
 

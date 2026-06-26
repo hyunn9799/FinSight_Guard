@@ -5,6 +5,23 @@
 - Python dependencies installed from `requirements.txt`.
 - PostgreSQL available locally for implementation validation once dependencies and migrations are added.
 - No live yfinance, Tavily, Firecrawl, OpenAI, Pinecone, Neo4j, OpenSearch, or Redis calls in tests.
+- If Docker is provided by OrbStack on this machine, use:
+  `/Applications/OrbStack.app/Contents/MacOS/xbin/docker-compose`.
+
+## Local Test Database
+
+Start PostgreSQL and create the test database:
+
+```bash
+/Applications/OrbStack.app/Contents/MacOS/xbin/docker-compose up -d db
+/Applications/OrbStack.app/Contents/MacOS/xbin/docker-compose exec -T db createdb -U finsight finsight_test
+```
+
+Set the test database URL:
+
+```bash
+export TEST_DATABASE_URL=postgresql+psycopg://finsight:finsight@localhost:5432/finsight_test
+```
 
 ## Validation Goal
 
@@ -16,7 +33,7 @@ Expected commands after implementation:
 
 ```bash
 python -m compileall src
-pytest tests/test_storage_postgres_schema.py
+uv --cache-dir /private/tmp/uv-cache run --with-requirements requirements.txt pytest tests/test_storage_postgres_schema.py
 ```
 
 Expected outcome:
@@ -30,7 +47,7 @@ Expected outcome:
 Expected command:
 
 ```bash
-pytest tests/test_storage_postgres_repositories.py
+uv --cache-dir /private/tmp/uv-cache run --with-requirements requirements.txt pytest tests/test_storage_postgres_repositories.py
 ```
 
 Expected outcome:
@@ -47,7 +64,7 @@ Expected outcome:
 Expected command:
 
 ```bash
-pytest tests/test_storage_postgres_research_flow.py
+uv --cache-dir /private/tmp/uv-cache run --with-requirements requirements.txt pytest tests/test_storage_postgres_research_flow.py
 ```
 
 Expected outcome:
@@ -61,7 +78,7 @@ Expected outcome:
 Expected command:
 
 ```bash
-pytest tests/test_storage_postgres_privacy.py
+uv --cache-dir /private/tmp/uv-cache run --with-requirements requirements.txt pytest tests/test_storage_postgres_privacy.py tests/test_storage_postgres_ux.py
 ```
 
 Expected outcome:
@@ -77,7 +94,7 @@ Expected outcome:
 Expected command:
 
 ```bash
-pytest tests/test_storage_postgres_projection_status.py
+uv --cache-dir /private/tmp/uv-cache run --with-requirements requirements.txt pytest tests/test_storage_postgres_projection_status.py
 ```
 
 Expected outcome:

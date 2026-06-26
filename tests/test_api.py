@@ -93,6 +93,7 @@ def test_backtest_endpoint_passes_enable_flag_and_returns_analysis(monkeypatch) 
             "evaluation_result": _evaluation(),
             "backtest_analysis": {"ticker": "AAPL", "summary": "과거 시뮬레이션 참고"},
             "report_path": "reports/bt123_AAPL.json",
+            "request_id": "33333333-3333-3333-3333-333333333333",
             "errors": [],
         }
 
@@ -108,6 +109,7 @@ def test_backtest_endpoint_passes_enable_flag_and_returns_analysis(monkeypatch) 
 
     assert captured["enable_backtest"] is True
     assert payload["run_id"] == "bt123"
+    assert payload["request_id"] == "33333333-3333-3333-3333-333333333333"
     assert payload["backtest_analysis"]["ticker"] == "AAPL"
 
 
@@ -137,6 +139,45 @@ def test_metrics_endpoint() -> None:
         "successful_runs": 1,
         "failed_runs": 1,
         "average_evaluation_score": 0.75,
+    }
+
+
+def test_health_and_metrics_contract_survive_persisted_request_id(monkeypatch) -> None:
+    from fastapi.testclient import TestClient
+
+    reset_metrics()
+    record_run(True, 0.8)
+
+    def _fake_run(ticker, user_query=None, **kwargs):
+        return {
+            "run_id": "run-with-pg",
+            "status": "success",
+            "ticker": ticker,
+            "request_id": "22222222-2222-2222-2222-222222222222",
+            "final_report": None,
+            "errors": [],
+        }
+
+    monkeypatch.setattr(main, "run_research_workflow", _fake_run, raising=False)
+    client = TestClient(main.app)
+
+    analyze_response = client.post(
+        "/analyze",
+        json={
+            "ticker": "AAPL",
+            "investment_horizon": "장기",
+            "risk_profile": "중립형",
+        },
+    )
+    assert analyze_response.status_code == 200
+    assert analyze_response.json()["request_id"] == "22222222-2222-2222-2222-222222222222"
+
+    assert client.get("/health").json() == {"status": "ok"}
+    assert client.get("/metrics").json() == {
+        "total_runs": 1,
+        "successful_runs": 1,
+        "failed_runs": 0,
+        "average_evaluation_score": 0.8,
     }
 
 

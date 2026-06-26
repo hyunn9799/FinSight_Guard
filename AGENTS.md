@@ -180,6 +180,27 @@ After editing:
 2. Run relevant tests.
 3. Summarize changed files and remaining TODOs.
 
+## Spec Kit 학습 규칙
+
+이 프로젝트는 구현 속도를 높이는 것보다 Spec Kit의 설계 결정을 공부하는
+것을 우선한다.
+
+모든 Spec Kit 단계에서 다음 규칙을 지켜야 한다.
+1. 요청된 산출물 단계가 허용하기 전에는 구현 코드를 수정하지 않는다.
+2. 산출물을 만들거나 수정하기 전에 어떤 판단을 할지 먼저 설명한다.
+3. 산출물을 만들거나 수정한 뒤에는 다음 항목을 요약한다.
+   - 이번 단계의 목적
+   - 새로 생긴 파일 또는 변경된 파일
+   - 핵심 설계 결정
+   - 검토한 대안
+   - 현재 설계를 선택한 이유
+   - 사용자가 반드시 읽어야 할 부분
+4. 애매한 요구사항은 임의로 확정하지 말고 Assumptions 섹션에 기록한다.
+5. 구현 단계에서는 tasks.md의 모든 작업을 기본값으로 실행하지 않는다.
+   사용자가 명시한 task 범위만 실행한다.
+6. 각 구현 task 전에는 변경 대상 파일과 변경 이유를 설명한다.
+7. 각 구현 task 후에는 실제 변경 내용과 테스트 결과를 요약한다.
+
 ## GitHub Issue Rules
 
 All GitHub issues for this repository must be written in natural Korean.

@@ -10,6 +10,24 @@
 
 [Extract from feature spec: primary requirement + technical approach from research]
 
+## 학습 단계 브리핑
+
+<!--
+  필수 작성: plan을 채우기 전에 이번 단계에서 어떤 판단을 할지 먼저 설명한다.
+  범위, 기술 경계, evidence/safety 영향, 검토할 절충안, assumptions,
+  예상 변경 파일을 포함한다.
+-->
+
+**이번 단계의 목적**: [학습자가 이 plan을 왜 읽어야 하는지 설명]
+
+**이번 단계에서 확인할 판단**:
+- [범위 결정]
+- [아키텍처 또는 의존성 결정]
+- [안전성/evidence/관측성 관련 결정]
+
+**Assumptions**:
+- [애매한 요구사항을 임의로 확정하지 말고 assumptions로 기록]
+
 ## Technical Context
 
 <!--
@@ -40,6 +58,9 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
+- Learning-oriented Spec Kit governance: 산출물 생성 전에 계획 판단을
+  설명하고, assumptions를 명시하며, 최종 plan 요약에 핵심 결정, 대안,
+  선택 이유, 반드시 읽을 섹션이 포함될 때만 PASS.
 - Evidence grounding: important numeric or factual claims map to `EvidenceItem`
   records and the report includes an evidence summary.
 - Financial safety: no buy/sell/hold recommendation, no trading/order execution,
@@ -124,3 +145,17 @@ directories captured above]
 |-----------|------------|-------------------------------------|
 | [e.g., 4th project] | [current need] | [why 3 projects insufficient] |
 | [e.g., Repository pattern] | [specific problem] | [why direct DB access insufficient] |
+
+## 단계 완료 리뷰
+
+<!--
+  필수 작성: plan과 설계 산출물을 만들거나 수정한 뒤 학습 관점의 결과를
+  요약한다.
+-->
+
+- **이번 단계의 목적**: [이 단계에서 결정하려던 것]
+- **새로 생긴 파일 또는 변경된 파일**: [생성/수정 파일]
+- **핵심 설계 결정**: [결정 목록]
+- **검토한 대안**: [대안과 절충점]
+- **현재 설계를 선택한 이유**: [선택 근거]
+- **반드시 읽어야 할 부분**: [학습자가 확인할 구체적인 섹션]
