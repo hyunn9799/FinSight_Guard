@@ -10,9 +10,14 @@ description: "Task list template for feature implementation"
 **Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, contracts/
 
 **Tests**: Deterministic tests are REQUIRED for changes that affect indicators,
+WaveAnalysis, GraphRAG retrieval/fallback, scenario-to-evidence persistence,
 safety checks, evaluator behavior, workflow routing, report storage, FastAPI
-health/analyze behavior, provider fallback, or report generation. Tests MUST NOT
-depend on live external APIs.
+health/analyze behavior, provider fallback, paper-trading simulation, or report
+generation. Tests MUST NOT depend on live external APIs, live graph services, or
+live brokerage/order-execution systems.
+Tasks that touch Pinecone, Neo4j, OpenSearch, or Redis MUST include deterministic
+tests or fakes proving those stores resolve to canonical PostgreSQL records and
+degrade without mutating source-of-truth data.
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
@@ -78,6 +83,14 @@ Examples of foundational tasks (adjust based on your project):
       forbidden phrase validation when report text can change
 - [ ] T012 Configure structured logging, report persistence, health checks, and
       metrics when runtime workflow paths can change
+- [ ] T013 Configure GraphRAG context, graph evidence-path, and projection-status
+      test fixtures when graph relationships can change
+- [ ] T014 Configure paper-trading or mock-investment fakes when simulation
+      behavior can change; never use live order execution in tests
+
+When a story changes Pinecone, Neo4j, OpenSearch, or Redis behavior, add
+story-specific tasks for deterministic index-store fakes and canonical-reference
+validation.
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
@@ -95,18 +108,18 @@ Examples of foundational tasks (adjust based on your project):
 > constitution-governed behavior. External APIs must be mocked or replaced with
 > local fakes.**
 
-- [ ] T013 [P] [US1] Contract test for [endpoint] in tests/contract/test_[name].py
-- [ ] T014 [P] [US1] Integration test for [user journey] in tests/integration/test_[name].py
-- [ ] T015 [P] [US1] Safety/evidence/routing test for [behavior] in tests/[area]/test_[name].py
+- [ ] T015 [P] [US1] Contract test for [endpoint] in tests/contract/test_[name].py
+- [ ] T016 [P] [US1] Integration test for [user journey] in tests/integration/test_[name].py
+- [ ] T017 [P] [US1] Safety/evidence/routing test for [behavior] in tests/[area]/test_[name].py
 
 ### Implementation for User Story 1
 
-- [ ] T016 [P] [US1] Create [Entity1] model in src/models/[entity1].py
-- [ ] T017 [P] [US1] Create [Entity2] model in src/models/[entity2].py
-- [ ] T018 [US1] Implement [Service] in src/services/[service].py (depends on T016, T017)
-- [ ] T019 [US1] Implement [endpoint/feature] in src/[location]/[file].py
-- [ ] T020 [US1] Add validation and error handling
-- [ ] T021 [US1] Add structured logging, degraded-data notes, and metrics for user story 1 operations
+- [ ] T018 [P] [US1] Create [Entity1] model in src/models/[entity1].py
+- [ ] T019 [P] [US1] Create [Entity2] model in src/models/[entity2].py
+- [ ] T020 [US1] Implement [Service] in src/services/[service].py (depends on T018, T019)
+- [ ] T021 [US1] Implement [endpoint/feature] in src/[location]/[file].py
+- [ ] T022 [US1] Add validation and error handling
+- [ ] T023 [US1] Add structured logging, degraded-data notes, and metrics for user story 1 operations
 
 **Checkpoint**: At this point, User Story 1 should be fully functional and testable independently
 
@@ -120,16 +133,16 @@ Examples of foundational tasks (adjust based on your project):
 
 ### Tests for User Story 2 ⚠️
 
-- [ ] T022 [P] [US2] Contract test for [endpoint] in tests/contract/test_[name].py
-- [ ] T023 [P] [US2] Integration test for [user journey] in tests/integration/test_[name].py
-- [ ] T024 [P] [US2] Safety/evidence/routing test for [behavior] in tests/[area]/test_[name].py
+- [ ] T024 [P] [US2] Contract test for [endpoint] in tests/contract/test_[name].py
+- [ ] T025 [P] [US2] Integration test for [user journey] in tests/integration/test_[name].py
+- [ ] T026 [P] [US2] Safety/evidence/routing test for [behavior] in tests/[area]/test_[name].py
 
 ### Implementation for User Story 2
 
-- [ ] T025 [P] [US2] Create [Entity] model in src/models/[entity].py
-- [ ] T026 [US2] Implement [Service] in src/services/[service].py
-- [ ] T027 [US2] Implement [endpoint/feature] in src/[location]/[file].py
-- [ ] T028 [US2] Integrate with User Story 1 components (if needed)
+- [ ] T027 [P] [US2] Create [Entity] model in src/models/[entity].py
+- [ ] T028 [US2] Implement [Service] in src/services/[service].py
+- [ ] T029 [US2] Implement [endpoint/feature] in src/[location]/[file].py
+- [ ] T030 [US2] Integrate with User Story 1 components (if needed)
 
 **Checkpoint**: At this point, User Stories 1 AND 2 should both work independently
 
@@ -143,15 +156,15 @@ Examples of foundational tasks (adjust based on your project):
 
 ### Tests for User Story 3 ⚠️
 
-- [ ] T029 [P] [US3] Contract test for [endpoint] in tests/contract/test_[name].py
-- [ ] T030 [P] [US3] Integration test for [user journey] in tests/integration/test_[name].py
-- [ ] T031 [P] [US3] Safety/evidence/routing test for [behavior] in tests/[area]/test_[name].py
+- [ ] T031 [P] [US3] Contract test for [endpoint] in tests/contract/test_[name].py
+- [ ] T032 [P] [US3] Integration test for [user journey] in tests/integration/test_[name].py
+- [ ] T033 [P] [US3] Safety/evidence/routing test for [behavior] in tests/[area]/test_[name].py
 
 ### Implementation for User Story 3
 
-- [ ] T032 [P] [US3] Create [Entity] model in src/models/[entity].py
-- [ ] T033 [US3] Implement [Service] in src/services/[service].py
-- [ ] T034 [US3] Implement [endpoint/feature] in src/[location]/[file].py
+- [ ] T034 [P] [US3] Create [Entity] model in src/models/[entity].py
+- [ ] T035 [US3] Implement [Service] in src/services/[service].py
+- [ ] T036 [US3] Implement [endpoint/feature] in src/[location]/[file].py
 
 **Checkpoint**: All user stories should now be independently functional
 

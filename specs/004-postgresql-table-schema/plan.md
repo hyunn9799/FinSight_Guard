@@ -6,7 +6,7 @@
 
 ## Summary
 
-Introduce PostgreSQL as the canonical persistence layer for the financial research platform while preserving the existing research-only safety posture. The implementation will replace local-only/in-memory persistence paths with a source-of-truth schema covering research workflow records, evidence, reports, source documents, projection status, local/demo users, in-app notifications, research-only portfolios, and canonical wave-theory graph records. Pinecone, Neo4j, OpenSearch, and Redis remain derived or ephemeral systems whose records must resolve back to PostgreSQL IDs.
+Introduce PostgreSQL as the canonical persistence layer for the financial research platform while preserving the existing research-only safety posture. The implementation will replace local-only/in-memory persistence paths with a source-of-truth schema covering research workflow records, evidence, reports, source documents, projection status, local/demo users, in-app notifications, research-only portfolios, and canonical wave-theory graph records. Pinecone, Neo4j, OpenSearch, and Redis remain derived or ephemeral systems whose records must resolve back to PostgreSQL IDs. Neo4j is still a first-class MVP capability as the GraphRAG relationship retrieval layer, but it is not the canonical durable store.
 
 ## Technical Context
 
@@ -14,7 +14,7 @@ Introduce PostgreSQL as the canonical persistence layer for the financial resear
 
 **Primary Dependencies**: Existing FastAPI, Streamlit, Pydantic v2, pytest, LangGraph workflow modules, yfinance/news providers, plus SQLAlchemy 2.x, Alembic, and psycopg for PostgreSQL persistence.
 
-**Storage**: PostgreSQL becomes the durable source of truth. Existing local JSON/Markdown reports remain transitional export/demo artifacts. Pinecone, Neo4j, and OpenSearch are rebuildable projections. Redis is ephemeral cache/queue/rate-limit/session support only.
+**Storage**: PostgreSQL becomes the durable source of truth. Existing local JSON/Markdown reports remain transitional export/demo artifacts. Neo4j is the rebuildable GraphRAG relationship projection used to retrieve Company-centered subgraphs for scenario generation. Pinecone and OpenSearch are rebuildable semantic/keyword projections. Redis is ephemeral cache/queue/rate-limit/session support only.
 
 **Testing**: pytest with deterministic repository tests using isolated transactions or a local test database fixture; external providers and derived index clients must be faked or monkeypatched.
 
@@ -26,7 +26,7 @@ Introduce PostgreSQL as the canonical persistence layer for the financial resear
 
 **Constraints**: No brokerage integration, order execution, buy/sell/hold recommendations, guaranteed returns, guaranteed targets, paid provider requirement, real login implementation, external notification delivery, or treating derived indexes as canonical stores. User deletion must anonymize/delete user-identifying UX data while preserving non-PII research audit records.
 
-**Scale/Scope**: First PostgreSQL MVP includes research workflow tables, source document/chunk tables, projection status, local/demo users, settings, in-app notifications, portfolios, portfolio items, wave rules, wave scenarios, invalidation conditions, evidence paths, and evidence path steps. Provider sync batches, immutable raw payload retention, request-link history, auth identities, durable sessions, notification preferences, and external delivery attempts are deferred.
+**Scale/Scope**: First PostgreSQL MVP includes research workflow tables, source document/chunk tables, projection status, local/demo users, settings, in-app notifications, portfolios, portfolio items, wave rules, wave scenarios, invalidation conditions, evidence paths, and evidence path steps. These canonical records support a Neo4j-backed GraphRAG flow that retrieves NewsEvent, FinancialMetric, TechnicalAnalysis, WaveAnalysis, NEoWaveRule, Risk, Scenario, Evidence, and Report relationships around a Company/Ticker context. Provider sync batches, immutable raw payload retention, request-link history, auth identities, durable sessions, notification preferences, and external delivery attempts are deferred.
 
 ## Constitution Check
 

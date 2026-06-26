@@ -2,13 +2,60 @@
 
 ## Project Identity
 
-This project is a portfolio-grade LangGraph-based financial research multi-agent workflow.
+This project is a portfolio-grade LangGraph and Neo4j GraphRAG-based financial
+research multi-agent workflow.
 
 It is NOT a stock recommendation system.
-It is NOT an automated trading system.
+The current MVP is NOT a live automated trading system.
 It is NOT allowed to guarantee profit, predict returns with certainty, or tell users to buy/sell a stock.
 
-The system is an evidence-based financial research assistant that helps users compare scenarios using market data, financial data, and news evidence.
+The system is an evidence-based financial research assistant that helps users
+compare Bull/Base/Bear scenarios using market data, financial data, news events,
+technical analysis, NEoWave rule candidates, and graph evidence paths.
+
+Longer-term roadmap work may add signal candidates and paper-trading or mock
+investment API validation. Those stages must remain simulated-only until a
+separate live-trading review approves user consent, regulatory, risk-management,
+and operational-stability requirements.
+
+## MVP Definition
+
+The MVP is a GraphRAG-based AI Research Assistant that generates ticker-level
+Bull/Base/Bear scenario reports by combining:
+
+1. news events
+2. financial metrics
+3. technical analysis results
+4. NEoWave-based wave analysis candidates
+5. risks and confirmation/invalidation conditions
+6. evidence paths retrieved from a Company-centered graph
+
+The system should use a Company node as the center of graph retrieval, find the
+related NewsEvent, FinancialMetric, TechnicalAnalysis, WaveAnalysis, NEoWaveRule,
+Risk, Scenario, Evidence, and Report nodes, and use that subgraph as LLM context
+for scenario generation.
+
+After report generation, the system must persist which Scenario was supported
+by which NewsEvent, FinancialMetric, TechnicalAnalysis, WaveAnalysis, Evidence,
+and Risk relationships.
+
+## Roadmap Boundaries
+
+Phase 1 is the current Research Report MVP:
+- Bull/Base/Bear scenario report generation
+- news, financial, technical, NEoWave, risk, and GraphRAG evidence integration
+- no real trading and no order execution
+
+Phase 2 may introduce Signal Candidate records:
+- convert confirmation, invalidation, and risk conditions into structured candidates
+- no order execution
+
+Phase 3 may introduce Paper Trading or Mock Investment API validation:
+- simulated orders only
+- record performance, drawdown, win rate, profit factor, and risk metrics
+
+Phase 4 live trading remains outside the MVP:
+- requires separate approval, regulatory review, risk controls, user consent, and operational stability review
 
 ## Core Portfolio Goal
 
@@ -18,12 +65,13 @@ The final project must demonstrate:
 2. Role-based agents
 3. Tool/API integration
 4. Evidence-grounded report generation
-5. Evaluator Agent for responsible AI review
-6. Conditional branching and retry logic
-7. Failure handling and fallback behavior
-8. Safety filters for financial advice
-9. Tests, logs, report storage, Streamlit UI
-10. FastAPI, Docker, health check, and basic monitoring endpoint
+5. Neo4j-backed GraphRAG retrieval over research evidence relationships
+6. Evaluator Agent for responsible AI review
+7. Conditional branching and retry logic
+8. Failure handling and fallback behavior
+9. Safety filters for financial advice
+10. Tests, logs, report storage, Streamlit UI
+11. FastAPI, Docker, health check, and basic monitoring endpoint
 
 ## Required Agents
 
@@ -45,20 +93,38 @@ The final project must demonstrate:
 - Extracts positive factors, negative factors, event risks, and source URLs.
 - Must attach EvidenceItem objects.
 
-### 4. Coordinator Agent
-- Combines Market/Fundamental/News analysis.
-- Generates a Korean research report.
-- Must use scenario-based wording:
-  - 관망 시나리오
-  - 분할 접근 시나리오
-  - 리스크 회피 시나리오
-- Must not directly recommend buy/sell/hold.
-- Must include evidence summary, risks, limitations, data date, and disclaimer.
+### 4. Wave Agent
+- Uses OHLCV-derived swing or monowave candidates and NEoWave rule materials.
+- Produces WaveAnalysis candidates, not definitive wave counts.
+- Must label rules as passed, failed, unknown, or needs_human_review.
+- Must generate confirmation and invalidation conditions when evidence supports them.
+- Must attach EvidenceItem objects and NEoWaveRule references.
+- Must not claim that a wave count is certain or that a price target is guaranteed.
 
-### 5. Evaluator Agent
+### 5. Graph Context Builder
+- Builds or queries the Company-centered GraphRAG context.
+- Uses Neo4j as a relationship index/knowledge graph for retrieval.
+- Uses PostgreSQL IDs as canonical references for graph nodes and relationships.
+- Retrieves related NewsEvent, FinancialMetric, TechnicalAnalysis, WaveAnalysis, NEoWaveRule, Risk, Scenario, Evidence, and Report paths.
+- Must keep graph output bounded to the context needed for scenario generation.
+- Must tolerate missing or stale graph projection records and fall back to canonical PostgreSQL evidence when possible.
+
+### 6. Coordinator / Scenario Agent
+- Combines Market/Fundamental/News/Wave analysis and Graph Context Builder output.
+- Generates a Korean research report.
+- Must use Bull/Base/Bear scenario framing:
+  - Bull / 상승 시나리오
+  - Base / 기준 시나리오
+  - Bear / 하락 시나리오
+- Each scenario must include supporting evidence, confirmation conditions, invalidation conditions, key risks, limitations, and data date.
+- Must not directly recommend buy/sell/hold.
+- Must include evidence summary, graph evidence path summary, risks, limitations, data date, and disclaimer.
+
+### 7. Evaluator Agent
 - Reviews the draft report.
 - Checks:
   - source grounding
+  - graph evidence path grounding
   - numeric consistency
   - excessive investment recommendation language
   - risk disclosure
@@ -68,7 +134,7 @@ The final project must demonstrate:
 - Returns pass/fail and scores.
 - If evaluation fails, workflow must route to Rewrite Agent.
 
-### 6. Rewrite Agent
+### 8. Rewrite Agent
 - Revises unsafe or weak reports based on Evaluator feedback.
 - Must remove direct investment advice.
 - Must add missing risk, limitation, or disclaimer sections.
@@ -107,10 +173,18 @@ The LangGraph workflow must include conditional routing:
 3. If news search fails:
    - fallback to mock news provider or continue with no-news warning.
 
-4. If Evaluator passes:
+4. If graph projection or GraphRAG retrieval fails:
+   - continue from canonical PostgreSQL evidence when possible.
+   - include graph-context warning or missing-data note.
+
+5. If Wave Agent cannot validate a NEoWave candidate:
+   - mark the rule status as unknown or needs_human_review.
+   - do not fabricate a wave count.
+
+6. If Evaluator passes:
    - save final report.
 
-5. If Evaluator fails:
+7. If Evaluator fails:
    - route to Rewrite Agent.
    - re-run Evaluator.
    - stop after max 2 rewrite attempts.
@@ -131,6 +205,58 @@ EvidenceItem fields:
 - description
 
 The final report should include an evidence summary section.
+
+## GraphRAG Rules
+
+PostgreSQL is the canonical durable store for requests, reports, evidence,
+analysis results, source documents, projection status, users, tickers, settings,
+notifications, and portfolios.
+
+Neo4j is the relationship index and GraphRAG retrieval layer. It should store
+only graph nodes and edges that improve scenario retrieval, explanation, and
+evidence-path tracing.
+
+Pinecone is the semantic vector index for news chunks, financial narrative
+chunks, NEoWave and wave-theory materials, and report chunks.
+
+OpenSearch is the keyword, full-text, and log search index for news originals,
+report text, logs, tickers, event keywords, and operational search.
+
+Redis is ephemeral infrastructure for cache, work queues, rate limits, sessions,
+deduplication, and short-lived workflow state.
+
+PostgreSQL records are authoritative. Pinecone, Neo4j, OpenSearch, and Redis
+must be rebuildable or disposable from canonical records and source documents.
+
+MVP graph nodes:
+- Company
+- Ticker
+- NewsEvent
+- FinancialMetric
+- TechnicalAnalysis
+- WaveAnalysis
+- NEoWaveRule
+- Scenario
+- Risk
+- Evidence
+- Report
+
+MVP graph relationships:
+- HAS_TICKER
+- MENTIONED_IN
+- HAS_METRIC
+- HAS_TECHNICAL_ANALYSIS
+- HAS_WAVE_ANALYSIS
+- CHECKED_BY
+- SUPPORTS
+- AFFECTS
+- HAS_RISK
+- SUPPORTED_BY
+- CONTAINS
+
+Do not graph every raw candle, every news sentence, every financial statement
+row, or every temporary calculation. Raw and canonical records belong in
+PostgreSQL; Neo4j stores retrieval-ready relationships and evidence paths.
 
 ## Observability Rules
 
@@ -156,6 +282,8 @@ Tests must not depend on live external APIs.
 
 Required tests:
 - technical indicator tests
+- wave analysis candidate tests
+- Graph Context Builder tests with mocked Neo4j/repository clients
 - safety checker tests
 - evaluator pass/fail tests
 - workflow routing tests
@@ -197,5 +325,5 @@ deleting them.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/004-postgresql-table-schema/plan.md
+at specs/006-provider-mcp-contracts/plan.md
 <!-- SPECKIT END -->

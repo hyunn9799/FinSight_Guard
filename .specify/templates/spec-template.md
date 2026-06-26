@@ -96,18 +96,28 @@
 ### Safety, Evidence & Reliability Requirements *(mandatory for research workflow changes)*
 
 - **SER-001**: System MUST avoid direct buy/sell/hold recommendations, trading
-  instructions, guaranteed return claims, guaranteed target claims, and order
-  execution behavior.
+  instructions, guaranteed return claims, guaranteed target claims, and live
+  order execution behavior.
 - **SER-002**: System MUST back important numeric or factual report claims with
-  `EvidenceItem` records when the feature affects research output.
+  `EvidenceItem` records or graph evidence paths when the feature affects
+  research output.
 - **SER-003**: Final Korean reports MUST include the required education-only,
   no-recommendation disclaimer exactly as defined in the constitution.
 - **SER-004**: System MUST disclose unavailable or degraded market, fundamental,
-  or news data instead of fabricating missing facts.
+  news, technical, wave, or graph-context data instead of fabricating missing
+  facts.
 - **SER-005**: Workflow-affecting features MUST define deterministic behavior for
-  validation failure, provider failure, evaluator failure, and rewrite limits.
+  validation failure, provider failure, graph retrieval failure, evaluator
+  failure, relationship persistence failure, and rewrite limits.
 - **SER-006**: Runtime-affecting features MUST preserve structured logs, report
-  storage, health checks, and metrics required by the constitution.
+  storage, scenario/evidence-path traceability, health checks, and metrics
+  required by the constitution.
+- **SER-007**: Paper trading or mock investment API features MUST remain
+  simulated-only and MUST NOT connect report output directly to live orders.
+- **SER-008**: Storage-affecting features MUST preserve the constitution's
+  storage/index roles: PostgreSQL is the source of truth; Pinecone, Neo4j,
+  OpenSearch, and Redis are rebuildable or ephemeral stores that resolve back to
+  canonical records.
 
 *Example of marking unclear requirements:*
 

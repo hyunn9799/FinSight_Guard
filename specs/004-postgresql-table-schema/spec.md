@@ -18,6 +18,12 @@
 - Q: What notification delivery scope should the MVP support? → A: In-app only: MVP notifications are stored app-internal records; email, webhook, push delivery, and channel retry handling are deferred.
 - Q: Should graph knowledge and evidence path tables be included in the first PostgreSQL MVP? → A: Include graph tables now: wave rules, wave scenarios, invalidation conditions, and evidence path tables are part of the first MVP implementation.
 
+### Session 2026-06-21
+
+- Q: What is the product MVP identity for graph persistence and retrieval? → A: The MVP is a Neo4j GraphRAG-based financial scenario research assistant that uses a Company/Ticker-centered subgraph of NewsEvent, FinancialMetric, TechnicalAnalysis, WaveAnalysis, NEoWaveRule, Risk, Scenario, Evidence, and Report relationships to generate Bull/Base/Bear scenario reports.
+- Q: What are the storage roles? → A: PostgreSQL remains the canonical durable source of truth, while Neo4j is a first-class but rebuildable GraphRAG relationship projection for retrieval and evidence-path traversal.
+- Q: How is NEoWave used? → A: NEoWave powers a Wave Agent that produces candidate wave analyses, rule check statuses, confirmation conditions, invalidation conditions, and human-review flags; it must not claim definitive wave counts or guaranteed targets.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Define Canonical Research Records (Priority: P1)
@@ -88,7 +94,7 @@ A demo user needs persistent history, preferences, notifications, and portfolio 
 - **FR-005**: System MUST represent ticker identity with symbol, market/exchange context, display name, provider metadata, active status, and timestamps.
 - **FR-006**: System MUST record analysis request inputs, request type, lifecycle status, timestamps, retry/degraded status, request parameters, and user-facing error or warning summaries.
 - **FR-007**: System MUST record agent and workflow node execution details, including node name, start/end time, status, retry count, degraded reason, error message, and evaluation score when available.
-- **FR-008**: System MUST record agent analysis results separately from generated reports so market, fundamental, news, backtest, optimization, graph context, evaluation, and rewrite results can be inspected independently.
+- **FR-008**: System MUST record agent analysis results separately from generated reports so market, fundamental, news, technical, wave, graph context, scenario, evaluation, and rewrite results can be inspected independently.
 - **FR-009**: System MUST store final and intermediate report records with language, title, structured content, rendered text, safety status, disclaimer presence, evaluation score, and report version.
 - **FR-010**: System MUST store EvidenceItem-compatible records with evidence ID, source type, source name, source URL, collection time, ticker, metric name, metric value, description, and relationship to request/result/report where applicable.
 - **FR-011**: System MUST store source document metadata and chunk provenance for news, financial-statement explanations, report text, logs, and wave-theory materials so semantic and keyword indexes are rebuildable.

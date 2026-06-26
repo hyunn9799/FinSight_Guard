@@ -22,7 +22,10 @@
 
 **Primary Dependencies**: [e.g., FastAPI, UIKit, LLVM or NEEDS CLARIFICATION]
 
-**Storage**: [if applicable, e.g., PostgreSQL, CoreData, files or N/A]
+**Storage**: [if applicable; identify canonical store vs rebuildable indexes,
+e.g., PostgreSQL source of truth, Pinecone semantic index, Neo4j GraphRAG
+relationship index, OpenSearch keyword/log index, Redis ephemeral runtime store,
+or N/A]
 
 **Testing**: [e.g., pytest, XCTest, cargo test or NEEDS CLARIFICATION]
 
@@ -40,18 +43,28 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-- Evidence grounding: important numeric or factual claims map to `EvidenceItem`
-  records and the report includes an evidence summary.
-- Financial safety: no buy/sell/hold recommendation, no trading/order execution,
-  no guaranteed returns or target guarantees, and the required Korean disclaimer
-  is preserved for final reports.
+- Graph grounding: important numeric, factual, or relationship claims map to
+  `EvidenceItem` records or graph evidence paths, and the report includes an
+  evidence summary.
+- Scenario safety: final reports use Bull/Base/Bear scenario framing; legacy
+  관망/분할 접근/리스크 회피 wording is interpretation or risk guidance only, not
+  action instruction.
+- Financial safety: no buy/sell/hold recommendation, no live trading/order
+  execution, no guaranteed returns or target guarantees, and the required Korean
+  disclaimer is preserved for final reports.
 - LangGraph workflow: role-based agents, conditional routing, retry/fallback
-  behavior, Evaluator pass/fail routing, and max two Rewrite attempts are
-  represented when the feature touches workflow behavior.
+  behavior, Graph Context Builder and Wave Agent behavior when applicable,
+  Evaluator pass/fail routing, and max two Rewrite attempts are represented when
+  the feature touches workflow behavior.
 - Deterministic quality: relevant tests avoid live external APIs and cover safety,
-  evaluator, routing, indicators, storage, and API behavior as applicable.
-- Observability: structured logs, report persistence, health checks, and metrics
-  remain available for affected workflow paths.
+  evaluator, routing, indicators, WaveAnalysis, GraphRAG retrieval/fallback,
+  storage, paper-trading simulations, and API behavior as applicable.
+- Observability: structured logs, report/scenario/evidence-path persistence,
+  projection status, health checks, and metrics remain available for affected
+  workflow paths.
+- Storage/index roles: PostgreSQL remains the canonical source of truth;
+  Pinecone, Neo4j, OpenSearch, and Redis are rebuildable or ephemeral stores that
+  resolve back to canonical records and degrade safely without mutating them.
 
 **Constitution Result**: [PASS/FAIL with notes and any justified exceptions]
 
