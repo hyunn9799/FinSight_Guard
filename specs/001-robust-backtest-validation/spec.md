@@ -1,117 +1,117 @@
-# Feature Specification: Robust Backtest Validation
+# 기능 명세: 견고한 백테스트 검증
 
-**Feature Branch**: `[001-robust-backtest-validation]`
+**기능 브랜치**: `[001-robust-backtest-validation]`
 
-**Created**: 2026-06-17
+**작성일**: 2026-06-17
 
-**Status**: Draft
+**상태**: 초안
 
-**Input**: User description: "optuna를 쓰는데 특정 시기의 가장좋은 수익률을 토대로 최적파라미터를 뽑아서 적용시키는데 이 방법 별로 안좋은것 같아 어떻게하면 좋을까 지금 프로젝트 코드 이해한다음에 답변해줘"
+**입력**: 사용자 설명: "optuna를 쓰는데 특정 시기의 가장좋은 수익률을 토대로 최적파라미터를 뽑아서 적용시키는데 이 방법 별로 안좋은것 같아 어떻게하면 좋을까 지금 프로젝트 코드 이해한다음에 답변해줘"
 
-## User Scenarios & Testing *(mandatory)*
+## 사용자 시나리오 및 테스트 *(필수)*
 
-### User Story 1 - Validate Optimization Robustness (Priority: P1)
+### 사용자 스토리 1 - 최적화 견고성 검증 (우선순위: P1)
 
-As a research user, I want optimization results to show whether a parameter set remains reasonable outside the period it was selected from, so that I do not mistake a single-period best result for a reliable strategy.
+리서치 사용자는 하나의 구간에서 선택된 매개변수 집합이 그 구간 밖에서도 합리적인 결과를 유지하는지 최적화 결과에서 확인하여, 단일 구간의 최고 성과를 신뢰할 수 있는 전략으로 오해하지 않기를 원한다.
 
-**Why this priority**: The current optimization experience can overemphasize the best historical simulation return from one selected period, which creates a high risk of overfitting and misleading interpretation.
+**이 우선순위인 이유**: 현재 최적화 경험은 선택한 한 구간에서 가장 높은 과거 시뮬레이션 수익률을 지나치게 강조할 수 있으며, 이는 과적합과 잘못된 해석의 위험을 크게 높인다.
 
-**Independent Test**: Can be fully tested by running an optimization on deterministic historical sample data and confirming the result includes separate selection-period and validation-period outcomes with a clear robustness status.
+**독립 테스트**: 결정적인 과거 표본 데이터로 최적화를 실행하고, 결과에 선택 구간과 검증 구간의 성과가 분리되어 있으며 명확한 견고성 상태가 포함되는지 확인하여 완전히 테스트할 수 있다.
 
-**Acceptance Scenarios**:
+**인수 시나리오**:
 
-1. **Given** a user runs strategy optimization over a historical range, **When** the optimized result is displayed, **Then** the result separates the period used to select parameters from at least one later or held-out validation period.
-2. **Given** the selected parameters perform well in the selection period but materially worse in validation, **When** the result is displayed, **Then** the system labels the result as fragile or overfit-risk rather than presenting it as the best parameter set to apply.
-3. **Given** the available history is too short to support a meaningful validation split, **When** the user requests optimization, **Then** the system discloses the limitation and avoids presenting the result as robust.
-
----
-
-### User Story 2 - Compare Risk-Adjusted Outcomes (Priority: P2)
-
-As a research user, I want optimized strategy results to include downside and stability measures, so that I can compare scenarios using more than headline return.
-
-**Why this priority**: A parameter set with the highest historical return may be unacceptable if it depends on high drawdown, too few trades, excessive churn, or unstable performance across subperiods.
-
-**Independent Test**: Can be tested independently by evaluating a completed optimization result and confirming that return, drawdown, trade count, validation degradation, and warnings are visible together.
-
-**Acceptance Scenarios**:
-
-1. **Given** optimization produces candidate parameter sets, **When** the user reviews results, **Then** the system shows both return-focused and risk-focused metrics for the selected candidate.
-2. **Given** two candidates have similar returns but different downside profiles, **When** the result is summarized, **Then** the safer candidate is distinguishable from the more fragile candidate.
-3. **Given** a candidate has too few trades to be meaningful, **When** it is shown, **Then** the system warns that the sample is insufficient.
+1. **전제** 사용자가 과거 기간에 대해 전략 최적화를 실행했을 때, **행동** 최적화 결과가 표시되면, **결과** 매개변수 선택에 사용한 구간과 이후 또는 별도로 보류한 검증 구간을 하나 이상 구분한다.
+2. **전제** 선택된 매개변수가 선택 구간에서는 좋은 성과를 내지만 검증에서는 유의미하게 나쁜 성과를 낼 때, **행동** 결과가 표시되면, **결과** 적용할 최적 매개변수 집합으로 제시하지 않고 취약하거나 과적합 위험이 있는 결과로 표시한다.
+3. **전제** 사용 가능한 과거 데이터가 의미 있는 검증 분할을 지원하기에 너무 짧을 때, **행동** 사용자가 최적화를 요청하면, **결과** 시스템은 한계를 공개하고 결과를 견고한 것으로 제시하지 않는다.
 
 ---
 
-### User Story 3 - Preserve Research-Only Framing (Priority: P3)
+### 사용자 스토리 2 - 위험 조정 결과 비교 (우선순위: P2)
 
-As a research user, I want optimization and backtest output to remain clearly educational and scenario-based, so that the product does not imply automated trading advice.
+리서치 사용자는 최적화된 전략 결과에 하방 위험과 안정성 지표가 포함되어, 대표 수익률 외의 정보로 시나리오를 비교하기를 원한다.
 
-**Why this priority**: The project constitution prohibits direct buy, sell, hold, guaranteed return, or trading-instruction behavior.
+**이 우선순위인 이유**: 과거 수익률이 가장 높은 매개변수 집합이라도 큰 낙폭, 지나치게 적은 거래, 과도한 매매 회전 또는 하위 기간별 불안정한 성과에 의존한다면 수용하기 어려울 수 있다.
 
-**Independent Test**: Can be tested independently by checking optimization output text and report evidence to ensure it contains no direct recommendation language and includes required limitations.
+**독립 테스트**: 완료된 최적화 결과에서 수익률, 낙폭, 거래 횟수, 검증 성과 저하와 경고가 함께 표시되는지 확인하여 독립적으로 테스트할 수 있다.
 
-**Acceptance Scenarios**:
+**인수 시나리오**:
 
-1. **Given** a user views optimized parameters, **When** the result is rendered, **Then** the system describes them as historical simulation candidates, not recommended trading settings.
-2. **Given** optimized backtest evidence is included in a research report, **When** the report is evaluated, **Then** it includes evidence, limitations, and the required no-recommendation disclaimer.
+1. **전제** 최적화가 후보 매개변수 집합을 생성했을 때, **행동** 사용자가 결과를 검토하면, **결과** 선택된 후보의 수익 중심 지표와 위험 중심 지표를 모두 표시한다.
+2. **전제** 두 후보의 수익률은 비슷하지만 하방 위험 특성이 다를 때, **행동** 결과를 요약하면, **결과** 더 안전한 후보를 더 취약한 후보와 구분할 수 있다.
+3. **전제** 후보의 거래 횟수가 의미를 판단하기에 너무 적을 때, **행동** 후보를 표시하면, **결과** 표본이 불충분하다는 경고를 제공한다.
 
-### Edge Cases
+---
 
-- Available data is shorter than the minimum period required for both selection and validation.
-- The best selection-period candidate has no trades or only one completed trade.
-- The validation period contains no qualifying signals.
-- Optimization finds a very high return with extreme drawdown or concentrated gains.
-- Data loading partially fails for one validation segment.
-- User changes the date range so validation would extend beyond available market data.
+### 사용자 스토리 3 - 리서치 전용 표현 유지 (우선순위: P3)
 
-## Requirements *(mandatory)*
+리서치 사용자는 제품이 자동화된 거래 조언을 암시하지 않도록 최적화와 백테스트 결과가 교육 목적과 시나리오 기반 표현을 명확히 유지하기를 원한다.
 
-### Functional Requirements
+**이 우선순위인 이유**: 프로젝트 constitution은 직접적인 매수·매도·보유 권유, 수익 보장 또는 거래 지시 동작을 금지한다.
 
-- **FR-001**: System MUST distinguish between parameter selection performance and out-of-sample validation performance in optimization results.
-- **FR-002**: System MUST avoid choosing final displayed parameters solely by the highest return in one user-selected period when validation data is available.
-- **FR-003**: Users MUST be able to see the date ranges used for parameter selection and validation.
-- **FR-004**: System MUST show robustness warnings when validation performance materially degrades relative to selection-period performance.
-- **FR-005**: System MUST include risk and reliability indicators alongside return, including at minimum downside loss exposure, number of trades, and validation degradation.
-- **FR-006**: System MUST flag candidate results with insufficient trade samples as low-confidence.
-- **FR-007**: System MUST explain when available data is insufficient for validation and continue with a clearly limited historical simulation view.
-- **FR-008**: System MUST allow users to compare the current manual parameter result against the optimized candidate using the same evaluation periods.
-- **FR-009**: System MUST label all optimized outputs as historical simulation candidates and not as recommended parameters.
-- **FR-010**: System MUST preserve deterministic behavior in tests by using fixed sample data rather than live market or news providers.
+**독립 테스트**: 최적화 출력 문구와 보고서 근거를 검사하여 직접적인 권유 표현이 없고 필수 한계가 포함되는지 독립적으로 테스트할 수 있다.
 
-### Safety, Evidence & Reliability Requirements *(mandatory for research workflow changes)*
+**인수 시나리오**:
 
-- **SER-001**: System MUST avoid direct buy/sell/hold recommendations, trading instructions, guaranteed return claims, guaranteed target claims, and order execution behavior.
-- **SER-002**: System MUST back important numeric or factual report claims with `EvidenceItem` records when the feature affects research output.
-- **SER-003**: Final Korean reports MUST include the required education-only, no-recommendation disclaimer exactly as defined in the constitution.
-- **SER-004**: System MUST disclose unavailable or degraded market, fundamental, or news data instead of fabricating missing facts.
-- **SER-005**: Workflow-affecting features MUST define deterministic behavior for validation failure, provider failure, evaluator failure, and rewrite limits.
-- **SER-006**: Runtime-affecting features MUST preserve structured logs, report storage, health checks, and metrics required by the constitution.
-- **SER-007**: Backtest optimization output MUST disclose that historical simulation performance does not guarantee future performance.
-- **SER-008**: Backtest optimization output MUST not trigger brokerage actions, order placement, or automated portfolio changes.
+1. **전제** 사용자가 최적화된 매개변수를 볼 때, **행동** 결과를 표시하면, **결과** 권장 거래 설정이 아니라 과거 시뮬레이션 후보로 설명한다.
+2. **전제** 최적화된 백테스트 근거가 리서치 보고서에 포함될 때, **행동** 보고서를 평가하면, **결과** 근거, 한계와 필수 비권유 면책문을 포함한다.
 
-### Key Entities *(include if feature involves data)*
+### 경계 사례
 
-- **Optimization Candidate**: A set of strategy parameters with selection-period return, validation-period return, trade count, downside metrics, and warnings.
-- **Validation Segment**: A historical time range reserved for checking whether candidate behavior persists outside the selection period.
-- **Robustness Summary**: A user-facing classification and explanation of candidate stability, degradation, sample sufficiency, and known limitations.
-- **Backtest Evidence Item**: A traceable record for numeric claims from historical simulations, including metric name, value, ticker, collection time, and source description.
+- 사용 가능한 데이터가 선택 구간과 검증 구간 모두에 필요한 최소 기간보다 짧다.
+- 선택 구간의 최적 후보에 거래가 없거나 완료된 거래가 한 건뿐이다.
+- 검증 구간에 조건을 충족하는 신호가 없다.
+- 최적화에서 극단적인 낙폭 또는 소수 거래의 집중 이익과 함께 매우 높은 수익률이 나온다.
+- 하나의 검증 구간에서 데이터 로딩이 부분적으로 실패한다.
+- 사용자가 날짜 범위를 변경하여 검증 구간이 사용 가능한 시장 데이터 범위를 벗어난다.
 
-## Success Criteria *(mandatory)*
+## 요구사항 *(필수)*
 
-### Measurable Outcomes
+### 기능 요구사항
 
-- **SC-001**: 100% of optimization result views show both selection-period and validation-period outcomes when enough history is available.
-- **SC-002**: 100% of optimization result views disclose a limitation when validation cannot be performed due to insufficient data.
-- **SC-003**: At least 95% of deterministic test cases correctly classify fragile candidates when validation return materially underperforms selection return.
-- **SC-004**: Users can compare manual parameters and optimized candidates across the same evaluation periods in one result view.
-- **SC-005**: Evaluator checks reject reports that present optimized parameters as guaranteed, recommended, or advice-like settings.
-- **SC-006**: All new optimization tests run without live external API calls.
+- **FR-001**: 시스템은 최적화 결과에서 매개변수 선택 성과와 표본 외 검증 성과를 반드시 구분해야 한다.
+- **FR-002**: 검증 데이터가 있을 때 시스템은 사용자가 선택한 한 구간의 최고 수익률만으로 최종 표시 매개변수를 선택해서는 안 된다.
+- **FR-003**: 사용자는 매개변수 선택과 검증에 사용된 날짜 범위를 볼 수 있어야 한다.
+- **FR-004**: 검증 성과가 선택 구간 성과보다 유의미하게 저하되면 시스템은 견고성 경고를 반드시 표시해야 한다.
+- **FR-005**: 시스템은 수익률과 함께 위험 및 신뢰성 지표를 반드시 포함해야 하며, 최소한 하방 손실 노출, 거래 횟수와 검증 성과 저하를 포함해야 한다.
+- **FR-006**: 시스템은 거래 표본이 불충분한 후보 결과를 반드시 낮은 신뢰도로 표시해야 한다.
+- **FR-007**: 시스템은 사용 가능한 데이터가 검증에 불충분한 경우를 반드시 설명하고, 한계가 명확한 과거 시뮬레이션 보기로 계속 진행해야 한다.
+- **FR-008**: 시스템은 사용자가 현재 수동 매개변수 결과와 최적화 후보를 동일한 평가 구간으로 비교할 수 있도록 해야 한다.
+- **FR-009**: 시스템은 모든 최적화 출력을 권장 매개변수가 아닌 과거 시뮬레이션 후보로 반드시 표시해야 한다.
+- **FR-010**: 시스템은 테스트에서 실시간 시장 또는 뉴스 공급자 대신 고정 표본 데이터를 사용하여 결정적 동작을 반드시 보존해야 한다.
 
-## Assumptions
+### 안전성, 근거 및 신뢰성 요구사항 *(리서치 워크플로 변경 시 필수)*
 
-- The feature improves interpretation of historical simulation results rather than creating a trading or recommendation engine.
-- Validation should use available historical data only and must not imply future predictive certainty.
-- If only a small amount of data is available, the product should prefer a limitation warning over a false sense of precision.
-- Existing backtest strategy behavior can remain available for manual experimentation while optimized results receive stronger robustness framing.
-- Existing project safety language and report disclaimer remain mandatory wherever optimization output is included in final research reports.
+- **SER-001**: 시스템은 직접적인 매수·매도·보유 권유, 거래 지시, 수익 보장 주장, 목표가 보장 주장과 주문 실행 동작을 반드시 피해야 한다.
+- **SER-002**: 기능이 리서치 출력에 영향을 주는 경우 시스템은 중요한 수치 또는 사실에 관한 보고서 주장을 `EvidenceItem` 레코드로 반드시 뒷받침해야 한다.
+- **SER-003**: 최종 한국어 보고서는 constitution에 정확히 정의된 교육 목적의 비권유 면책문을 반드시 포함해야 한다.
+- **SER-004**: 시스템은 누락되거나 성능이 저하된 시장·기업·뉴스 데이터를 조작하여 만들어내지 않고 반드시 공개해야 한다.
+- **SER-005**: 워크플로에 영향을 주는 기능은 검증 실패, 공급자 실패, 평가 실패와 재작성 제한에 대해 결정적인 동작을 반드시 정의해야 한다.
+- **SER-006**: 런타임에 영향을 주는 기능은 constitution이 요구하는 구조화 로그, 보고서 저장, 상태 확인과 지표를 반드시 보존해야 한다.
+- **SER-007**: 백테스트 최적화 출력은 과거 시뮬레이션 성과가 미래 성과를 보장하지 않는다는 사실을 반드시 공개해야 한다.
+- **SER-008**: 백테스트 최적화 출력은 중개 작업, 주문 제출 또는 자동 포트폴리오 변경을 실행해서는 안 된다.
+
+### 핵심 개체 *(기능에 데이터가 포함되는 경우)*
+
+- **최적화 후보(Optimization Candidate)**: 선택 구간 수익률, 검증 구간 수익률, 거래 횟수, 하방 지표와 경고를 포함하는 전략 매개변수 집합.
+- **검증 구간(Validation Segment)**: 선택 구간 밖에서도 후보 동작이 유지되는지 확인하기 위해 따로 확보한 과거 기간.
+- **견고성 요약(Robustness Summary)**: 후보 안정성, 성과 저하, 표본 충분성과 알려진 한계에 대한 사용자 대상 분류 및 설명.
+- **백테스트 근거 항목(Backtest Evidence Item)**: 지표 이름, 값, ticker, 수집 시각과 출처 설명을 포함하는 과거 시뮬레이션 수치 주장의 추적 가능한 레코드.
+
+## 성공 기준 *(필수)*
+
+### 측정 가능한 결과
+
+- **SC-001**: 충분한 과거 데이터가 있을 때 최적화 결과 보기의 100%가 선택 구간과 검증 구간의 결과를 모두 표시한다.
+- **SC-002**: 데이터가 부족하여 검증할 수 없을 때 최적화 결과 보기의 100%가 한계를 공개한다.
+- **SC-003**: 결정적 테스트 사례의 최소 95%가 검증 수익률이 선택 수익률보다 유의미하게 낮은 취약 후보를 올바르게 분류한다.
+- **SC-004**: 사용자는 하나의 결과 보기에서 수동 매개변수와 최적화 후보를 동일한 평가 구간으로 비교할 수 있다.
+- **SC-005**: Evaluator 검사는 최적화된 매개변수를 보장되거나 권장되거나 조언과 유사한 설정으로 제시하는 보고서를 거부한다.
+- **SC-006**: 모든 신규 최적화 테스트는 실시간 외부 API 호출 없이 실행된다.
+
+## 가정
+
+- 이 기능은 거래 또는 추천 엔진을 만드는 대신 과거 시뮬레이션 결과의 해석을 개선한다.
+- 검증은 사용 가능한 과거 데이터만 사용해야 하며 미래 예측의 확실성을 암시해서는 안 된다.
+- 사용할 수 있는 데이터가 적다면 제품은 거짓된 정밀함보다 한계 경고를 우선해야 한다.
+- 기존 백테스트 전략 동작은 수동 실험에 계속 사용할 수 있으며, 최적화 결과에는 더 강한 견고성 표현을 적용한다.
+- 최적화 출력이 최종 리서치 보고서에 포함될 때마다 기존 프로젝트 안전 문구와 보고서 면책문은 계속 필수다.

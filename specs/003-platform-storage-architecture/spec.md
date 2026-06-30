@@ -1,33 +1,33 @@
-# Feature Specification: Deferred Platform Storage Architecture
+# 기능 명세: 보류된 플랫폼 저장소 아키텍처
 
-**Feature Branch**: `[003-platform-storage-architecture]`
+**기능 브랜치**: `[003-platform-storage-architecture]`
 
-**Created**: 2026-06-18
+**작성일**: 2026-06-18
 
-**Status**: Draft / Deferred
+**상태**: 초안 / 보류
 
-**Input**: Deferred scope moved out of `specs/002-walk-forward-optimization` to keep the walk-forward MVP small and implementation-ready.
+**입력**: 워크포워드 MVP를 작고 구현 가능한 상태로 유지하기 위해 `specs/002-walk-forward-optimization`에서 분리한 보류 범위.
 
-## Scope Boundary
+## 범위 경계
 
-This draft captures future platform storage work only. It must not block the walk-forward optimization MVP.
+이 초안은 향후 플랫폼 저장소 작업만 다룬다. 워크포워드 최적화 MVP를 차단해서는 안 된다.
 
-## Future Platform Direction
+## 향후 플랫폼 방향
 
-- PostgreSQL may become the canonical source of truth for users, tickers, analysis requests, reports, analysis results, settings, notifications, portfolios, evidence metadata, and robust optimization outputs.
-- Pinecone may store semantic document chunk indexes for news, financial-statement explanations, and wave-theory materials.
-- Neo4j may store wave-theory rules, scenarios, invalidation conditions, graph evidence paths, and explainable relationship traversal.
-- OpenSearch may store news full text, report full text, logs, keyword indexes, and operational search views.
-- Redis may support cache, queue, rate limiting, session state, and short-lived workflow coordination.
+- PostgreSQL은 사용자, ticker, 분석 요청, 보고서, 분석 결과, 설정, 알림, 포트폴리오, 근거 메타데이터와 견고한 최적화 출력의 기준 정보원이 될 수 있다.
+- Pinecone은 뉴스, 재무제표 설명과 파동 이론 자료를 위한 의미 기반 문서 청크 인덱스를 저장할 수 있다.
+- Neo4j는 파동 이론 규칙, 시나리오, 무효화 조건, 그래프 근거 경로와 설명 가능한 관계 탐색을 저장할 수 있다.
+- OpenSearch는 뉴스 전문, 보고서 전문, 로그, 키워드 인덱스와 운영 검색 보기를 저장할 수 있다.
+- Redis는 캐시, 큐, 요청 속도 제한, 세션 상태와 단기 워크플로 조정을 지원할 수 있다.
 
-## Non-Goals
+## 비목표
 
-- This spec does not implement trading, brokerage integration, order execution, guaranteed return claims, or financial advice.
-- This spec does not change the MVP local report-store requirement in `002-walk-forward-optimization`.
+- 이 명세는 거래, 중개 서비스 연동, 주문 실행, 수익 보장 주장 또는 금융 자문을 구현하지 않는다.
+- 이 명세는 `002-walk-forward-optimization`의 MVP 로컬 보고서 저장소 요구사항을 변경하지 않는다.
 
-## Notes for Later Planning
+## 향후 계획을 위한 메모
 
-- Any future implementation plan must re-run the constitution check.
-- External infrastructure must be optional or locally reproducible for development.
-- Tests must use fakes, monkeypatches, or isolated local services and must not depend on live paid providers.
-- GitHub issues for this work should be grouped by platform milestone and written in natural Korean.
+- 향후 구현 계획은 constitution 점검을 다시 수행해야 한다.
+- 외부 인프라는 선택 사항이어야 하거나 개발 환경에서 로컬로 재현할 수 있어야 한다.
+- 테스트는 모의 객체, monkeypatch 또는 격리된 로컬 서비스를 사용해야 하며 실시간 유료 공급자에 의존해서는 안 된다.
+- 이 작업의 GitHub 이슈는 플랫폼 마일스톤별로 묶고 자연스러운 한국어로 작성하는 것이 좋다.

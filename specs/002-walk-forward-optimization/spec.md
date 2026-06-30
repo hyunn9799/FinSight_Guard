@@ -1,158 +1,158 @@
-# Feature Specification: Walk-Forward Strategy Optimization
+# 기능 명세: 워크포워드 전략 최적화
 
-**Feature Branch**: `[002-walk-forward-optimization]`
+**기능 브랜치**: `[002-walk-forward-optimization]`
 
-**Created**: 2026-06-17
+**작성일**: 2026-06-17
 
-**Status**: Draft
+**상태**: 초안
 
-**Input**: User description: "총수익률 단독 최적화를 금지하고, MDD, Sharpe, Sortino, 승률, profit factor, 거래 횟수, 평균 보유 기간, 수수료/슬리피지 반영 후 수익률, 시장 국면별 성능을 함께 평가한다. 특정 시기 전체에 한 번 최적화해 적용하는 대신 walk-forward optimization으로 train/test를 시간 순서대로 나누고, out-of-sample 성과, 최악 구간 성능, 안정성, 장세별 성과를 기준으로 robust parameter를 선택한다. MVP는 weighted risk-adjusted score, train/test 분리, walk-forward, regime별 성과 리포트, 이후 regime별 파라미터 적용 순서로 진행한다."
+**입력**: 사용자 설명: "총수익률 단독 최적화를 금지하고, MDD, Sharpe, Sortino, 승률, profit factor, 거래 횟수, 평균 보유 기간, 수수료/슬리피지 반영 후 수익률, 시장 국면별 성능을 함께 평가한다. 특정 시기 전체에 한 번 최적화해 적용하는 대신 walk-forward optimization으로 train/test를 시간 순서대로 나누고, out-of-sample 성과, 최악 구간 성능, 안정성, 장세별 성과를 기준으로 robust parameter를 선택한다. MVP는 weighted risk-adjusted score, train/test 분리, walk-forward, regime별 성과 리포트, 이후 regime별 파라미터 적용 순서로 진행한다."
 
-## Clarifications
+## 명확화
 
-### Session 2026-06-17
+### 세션 2026-06-17
 
-- Q: What guardrails should determine whether an optimized candidate can be labeled robust? → A: Minimum 30 trades and MDD 25% or lower.
-- Q: What default weighting policy should the weighted robust score use? → A: Risk-balanced: 30% out-of-sample return, 25% risk-adjusted return, 20% drawdown control, 15% worst-fold resilience, 10% stability/turnover penalty.
-- Q: How many valid test folds are required before walk-forward output can produce a robust candidate? → A: Minimum 3 valid test folds.
-- Q: When should regime-specific performance be marked low-confidence? → A: Fewer than 10 trades or fewer than 60 trading days in that regime.
-- Q: What default transaction cost assumptions should robust optimization use? → A: 0.05% one-way fee and 0.05% one-way slippage, user-adjustable.
+- 질문: 최적화 후보를 견고하다고 표시할 수 있는 보호 조건은 무엇인가? → 답변: 최소 30회 거래와 25% 이하의 MDD.
+- 질문: 가중 견고성 점수의 기본 가중치 정책은 무엇인가? → 답변: 위험 균형형으로 표본 외 수익률 30%, 위험 조정 수익률 25%, 낙폭 통제 20%, 최악 폴드 회복력 15%, 안정성/회전율 페널티 10%.
+- 질문: 워크포워드 출력이 견고한 후보를 생성하려면 몇 개의 유효 테스트 폴드가 필요한가? → 답변: 최소 3개의 유효 테스트 폴드.
+- 질문: 시장 국면별 성과를 낮은 신뢰도로 표시해야 하는 때는 언제인가? → 답변: 해당 국면에서 거래가 10회 미만이거나 거래일이 60일 미만인 경우.
+- 질문: 견고한 최적화에 적용할 기본 거래 비용 가정은 무엇인가? → 답변: 사용자가 조정할 수 있는 편도 수수료 0.05%와 편도 슬리피지 0.05%.
 
-## User Scenarios & Testing *(mandatory)*
+## 사용자 시나리오 및 테스트 *(필수)*
 
-### User Story 1 - Optimize With Risk Controls (Priority: P1)
+### 사용자 스토리 1 - 위험 통제를 적용한 최적화 (우선순위: P1)
 
-As a research user, I want strategy optimization to reject total-return-only ranking, so that a historically high return does not hide drawdown, excessive trading, weak validation, or unstable behavior.
+리서치 사용자는 과거의 높은 수익률이 낙폭, 과도한 거래, 취약한 검증 또는 불안정한 동작을 감추지 않도록 전략 최적화에서 총수익률만으로 순위를 매기는 방식을 배제하기를 원한다.
 
-**Why this priority**: The current optimization flow can select parameters by one headline return from one period. That creates overfitting risk and conflicts with the project's research-only positioning.
+**이 우선순위인 이유**: 현재 최적화 흐름은 한 구간의 대표 수익률 하나로 매개변수를 선택할 수 있다. 이는 과적합 위험을 만들고 프로젝트의 리서치 전용 방향과 충돌한다.
 
-**Independent Test**: Can be tested by running optimization on deterministic sample data where the highest-return candidate has unacceptable drawdown or too few trades and confirming it is not selected as the robust candidate.
+**독립 테스트**: 수익률이 가장 높은 후보의 낙폭이 허용할 수 없거나 거래 횟수가 너무 적은 결정적 표본 데이터로 최적화를 실행하고, 해당 후보가 견고한 후보로 선택되지 않는지 확인하여 테스트할 수 있다.
 
-**Acceptance Scenarios**:
+**인수 시나리오**:
 
-1. **Given** multiple parameter candidates are evaluated, **When** one candidate has the highest total return but breaches drawdown or trade-sample limits, **Then** the system excludes or clearly downgrades that candidate.
-2. **Given** a candidate has positive total return but poor risk-adjusted behavior, **When** results are ranked, **Then** the ranking favors a more stable candidate over the highest-return-only candidate.
-3. **Given** transaction cost assumptions are configured, **When** results are displayed, **Then** all return metrics reflect costs and the cost assumptions are visible.
-
----
-
-### User Story 2 - Validate With Walk-Forward Evaluation (Priority: P2)
-
-As a research user, I want optimization to use time-ordered train/test windows, so that parameters are evaluated only on periods that occur after the period used to select them.
-
-**Why this priority**: Financial time series must avoid future leakage. Walk-forward evaluation gives a more realistic view than optimizing once across a full selected period.
-
-**Independent Test**: Can be tested by creating deterministic dated sample data and confirming every test window starts after its train window, every fold result is reported, and aggregate results include median, worst-fold, and stability measures.
-
-**Acceptance Scenarios**:
-
-1. **Given** enough historical data is available, **When** the user runs robust optimization, **Then** the system produces multiple time-ordered train/test fold results.
-2. **Given** one fold performs much worse than the others, **When** the final summary is shown, **Then** the weak fold affects the robustness score and appears in the fold breakdown.
-3. **Given** historical data is too short for the requested walk-forward configuration, **When** optimization is requested, **Then** the system gives a limitation message and does not present the output as robust.
+1. **전제** 여러 매개변수 후보를 평가할 때, **행동** 한 후보의 총수익률이 가장 높지만 낙폭 또는 거래 표본 제한을 위반하면, **결과** 시스템은 해당 후보를 제외하거나 명확하게 낮은 순위로 조정한다.
+2. **전제** 후보의 총수익률은 양수이지만 위험 조정 동작이 좋지 않을 때, **행동** 결과의 순위를 매기면, **결과** 최고 수익률만 가진 후보보다 더 안정적인 후보를 우선한다.
+3. **전제** 거래 비용 가정을 설정했을 때, **행동** 결과를 표시하면, **결과** 모든 수익률 지표가 비용을 반영하고 비용 가정을 확인할 수 있다.
 
 ---
 
-### User Story 3 - Explain Regime-Specific Strengths and Weaknesses (Priority: P3)
+### 사용자 스토리 2 - 워크포워드 평가를 통한 검증 (우선순위: P2)
 
-As a research user, I want the optimized candidate to be evaluated by market regime, so that I can see whether it only works in one type of market or remains acceptable across different conditions.
+리서치 사용자는 매개변수를 선택한 구간보다 나중에 발생한 구간에서만 매개변수를 평가하도록 최적화가 시간 순서에 따른 학습/테스트(train/test) 창을 사용하기를 원한다.
 
-**Why this priority**: A parameter set that performs well only in a bull market may be fragile in bear, sideways, or high-volatility conditions.
+**이 우선순위인 이유**: 금융 시계열은 미래 정보 누수를 방지해야 한다. 워크포워드 평가는 선택한 전체 기간에 한 번만 최적화하는 방식보다 현실적인 관점을 제공한다.
 
-**Independent Test**: Can be tested by labeling deterministic sample periods by regime and confirming the output summarizes performance separately for bull, bear, sideways, high-volatility, and low-volatility segments when those segments exist.
+**독립 테스트**: 날짜가 있는 결정적 표본 데이터를 만들고 모든 테스트 창이 해당 학습 창 이후에 시작하는지, 모든 폴드 결과가 보고되는지, 집계 결과에 중앙값·최악 폴드·안정성 지표가 포함되는지 확인하여 테스트할 수 있다.
 
-**Acceptance Scenarios**:
+**인수 시나리오**:
 
-1. **Given** market regime labels exist for evaluated periods, **When** robust optimization completes, **Then** the result shows performance by regime.
-2. **Given** a candidate performs well overall but poorly in a bear or sideways regime, **When** the result is summarized, **Then** the system highlights that weakness as a risk.
-3. **Given** a regime has too little data, **When** regime performance is shown, **Then** the system marks that regime result as low-confidence instead of overinterpreting it.
+1. **전제** 충분한 과거 데이터를 사용할 수 있을 때, **행동** 사용자가 견고한 최적화를 실행하면, **결과** 시스템은 시간 순서에 따른 여러 학습/테스트 폴드 결과를 생성한다.
+2. **전제** 하나의 폴드가 다른 폴드보다 훨씬 나쁜 성과를 낼 때, **행동** 최종 요약을 표시하면, **결과** 취약한 폴드가 견고성 점수에 영향을 주고 폴드 상세 내역에 나타난다.
+3. **전제** 과거 데이터가 요청한 워크포워드 구성에 비해 너무 짧을 때, **행동** 최적화를 요청하면, **결과** 시스템은 한계 메시지를 제공하고 출력을 견고한 것으로 제시하지 않는다.
 
 ---
 
-### User Story 4 - Keep Optimization Research-Only (Priority: P4)
+### 사용자 스토리 3 - 시장 국면별 강점과 약점 설명 (우선순위: P3)
 
-As a research user, I want robust optimization output to remain clearly educational and non-prescriptive, so that it supports scenario comparison without becoming trading advice.
+리서치 사용자는 최적화된 후보가 한 유형의 시장에서만 동작하는지 또는 여러 조건에서 합리적인 결과를 유지하는지 확인할 수 있도록 시장 국면별로 평가되기를 원한다.
 
-**Why this priority**: The project constitution prohibits stock recommendations, trading instructions, guaranteed return claims, brokerage integration, and automated order execution.
+**이 우선순위인 이유**: 상승장에서만 좋은 성과를 내는 매개변수 집합은 하락장, 횡보장 또는 고변동성 조건에서 취약할 수 있다.
 
-**Independent Test**: Can be tested by checking the final output for required limitations, no-recommendation framing, and absence of forbidden advice language.
+**독립 테스트**: 결정적 표본 기간에 시장 국면 라벨을 지정하고, 해당 구간이 존재할 때 출력에서 상승장, 하락장, 횡보장, 고변동성과 저변동성 구간의 성과를 각각 요약하는지 확인하여 테스트할 수 있다.
 
-**Acceptance Scenarios**:
+**인수 시나리오**:
 
-1. **Given** robust parameters are selected, **When** the user reviews the output, **Then** the system labels them as historical simulation candidates rather than recommended trading settings.
-2. **Given** robust optimization evidence is included in a Korean research report, **When** the report is evaluated, **Then** it includes source-grounded metrics, limitations, scenario framing, and the required disclaimer.
+1. **전제** 평가 구간에 시장 국면 라벨이 있을 때, **행동** 견고한 최적화가 완료되면, **결과** 시장 국면별 성과를 표시한다.
+2. **전제** 후보가 전체적으로는 좋은 성과를 내지만 하락장 또는 횡보장에서 좋지 않은 성과를 낼 때, **행동** 결과를 요약하면, **결과** 시스템은 해당 약점을 위험으로 강조한다.
+3. **전제** 한 시장 국면의 데이터가 너무 적을 때, **행동** 시장 국면별 성과를 표시하면, **결과** 시스템은 과도하게 해석하지 않고 해당 국면의 결과를 낮은 신뢰도로 표시한다.
 
-### Edge Cases
+---
 
-- The highest-return candidate has fewer than the minimum meaningful number of trades.
-- A candidate has attractive average performance but unacceptable maximum drawdown.
-- A candidate is strong in one fold but poor in the worst fold.
-- A candidate is strong in bull regimes but weak in bear or sideways regimes.
-- A regime segment has too few observations to support a reliable conclusion.
-- Slippage or fee assumptions make a previously profitable candidate unprofitable.
-- Walk-forward windows cannot be created because the selected date range is too short.
-- A fold has no trades, no valid signals, or missing price data.
+### 사용자 스토리 4 - 리서치 전용 최적화 유지 (우선순위: P4)
 
-## Requirements *(mandatory)*
+리서치 사용자는 거래 조언으로 바뀌지 않으면서 시나리오 비교를 지원하도록 견고한 최적화 출력이 교육 목적과 비지시적 표현을 명확히 유지하기를 원한다.
 
-### Functional Requirements
+**이 우선순위인 이유**: 프로젝트 constitution은 종목 추천, 거래 지시, 수익 보장 주장, 중개 서비스 연동과 자동 주문 실행을 금지한다.
 
-- **FR-001**: System MUST prohibit total return as the sole optimization objective for strategy parameter selection.
-- **FR-002**: System MUST evaluate candidate parameters using return, drawdown, risk-adjusted return, win rate, profit factor, trade count, average holding period, transaction-cost-adjusted return, and turnover or trading-frequency measures.
-- **FR-003**: System MUST require at least 30 completed trades and maximum drawdown of 25% or lower before a candidate can be labeled robust.
-- **FR-004**: System MUST apply transaction costs before presenting optimized return metrics, defaulting to 0.05% one-way fee and 0.05% one-way slippage while allowing users to change those assumptions.
-- **FR-005**: System MUST support a weighted robust score that defaults to a risk-balanced policy: 30% out-of-sample return, 25% risk-adjusted return, 20% drawdown control, 15% worst-fold resilience, and 10% stability or turnover penalty.
-- **FR-006**: System MUST report the score components used to rank candidates so users can understand why a candidate was selected.
-- **FR-007**: System MUST split historical data in time order for validation, ensuring each validation period occurs after its corresponding selection period.
-- **FR-008**: System MUST provide fold-level walk-forward results, including train period, test period, selected candidate summary, out-of-sample metrics, and warnings.
-- **FR-009**: System MUST aggregate fold results using stability-aware summaries, including median out-of-sample return, worst fold return, drawdown, and fold-to-fold variability.
-- **FR-010**: System MUST identify and disclose insufficient data when the requested walk-forward evaluation cannot produce at least 3 valid test folds.
-- **FR-011**: System MUST classify evaluated periods into market regimes when enough data exists, including bull, bear, sideways, high-volatility, and low-volatility conditions.
-- **FR-012**: System MUST report strategy behavior separately by market regime and mark regime results as low-confidence when that regime has fewer than 10 completed trades or fewer than 60 trading days.
-- **FR-013**: System MUST initially select one robust all-regime parameter candidate before introducing separate regime-specific parameter sets.
-- **FR-014**: System MUST allow future regime-specific parameter evaluation only when each regime-specific candidate has enough out-of-sample evidence and risk disclosure.
-- **FR-015**: System MUST compare robust optimized candidates against the current manual parameter configuration and a simple passive baseline over the same evaluation periods.
-- **FR-016**: System MUST store or expose enough optimization summary data for reports to cite numeric claims with traceable evidence.
-- **FR-017**: System MUST keep all optimization tests deterministic and independent of live external providers.
+**독립 테스트**: 최종 출력에 필수 한계와 비권유 표현이 있고 금지된 조언 문구가 없는지 검사하여 테스트할 수 있다.
 
-### Safety, Evidence & Reliability Requirements *(mandatory for research workflow changes)*
+**인수 시나리오**:
 
-- **SER-001**: System MUST avoid direct buy/sell/hold recommendations, trading instructions, guaranteed return claims, guaranteed target claims, and order execution behavior.
-- **SER-002**: System MUST back important numeric or factual report claims with `EvidenceItem` records when the feature affects research output.
-- **SER-003**: Final Korean reports MUST include the required education-only, no-recommendation disclaimer exactly as defined in the constitution.
-- **SER-004**: System MUST disclose unavailable or degraded market, fundamental, or news data instead of fabricating missing facts.
-- **SER-005**: Workflow-affecting features MUST define deterministic behavior for validation failure, provider failure, evaluator failure, and rewrite limits.
-- **SER-006**: Runtime-affecting features MUST preserve structured logs, report storage, health checks, and metrics required by the constitution.
-- **SER-007**: Optimization output MUST state that backtest and out-of-sample historical evaluation reduce but do not eliminate overfitting risk.
-- **SER-008**: Optimization output MUST not describe selected parameters as recommendations, signals to trade, or future-return expectations.
-- **SER-009**: Evaluator checks MUST fail any report that presents robust parameters as guaranteed, advice-like, or appropriate for automatic execution.
+1. **전제** 견고한 매개변수가 선택되었을 때, **행동** 사용자가 출력을 검토하면, **결과** 시스템은 권장 거래 설정이 아닌 과거 시뮬레이션 후보로 표시한다.
+2. **전제** 견고한 최적화 근거가 한국어 리서치 보고서에 포함될 때, **행동** 보고서를 평가하면, **결과** 출처에 근거한 지표, 한계, 시나리오 기반 표현과 필수 면책문을 포함한다.
 
-### Key Entities *(include if feature involves data)*
+### 경계 사례
 
-- **Optimization Run**: A single user-requested evaluation with ticker, date range, cost assumptions, scoring policy, fold setup, and summary status.
-- **Parameter Candidate**: A parameter set evaluated by return, risk, trade behavior, cost-adjusted performance, fold stability, and warnings.
-- **Walk-Forward Fold**: A time-ordered selection period and subsequent validation period with out-of-sample metrics.
-- **Robust Score**: A transparent score combining out-of-sample performance, downside control, fold stability, worst-period resilience, and turnover penalties.
-- **Market Regime Segment**: A labeled market condition used to summarize candidate behavior by bull, bear, sideways, high-volatility, or low-volatility periods.
-- **Optimization Evidence Item**: A traceable evidence record for numeric optimization claims used in reports or agent outputs.
+- 최고 수익률 후보의 거래 횟수가 의미 있는 최소 거래 횟수보다 적다.
+- 후보의 평균 성과는 매력적이지만 최대 낙폭을 허용할 수 없다.
+- 후보가 한 폴드에서는 강하지만 최악 폴드에서는 좋지 않은 성과를 낸다.
+- 후보가 상승장에서는 강하지만 하락장 또는 횡보장에서는 약하다.
+- 시장 국면 구간의 관측치가 너무 적어 신뢰할 수 있는 결론을 뒷받침할 수 없다.
+- 슬리피지 또는 수수료 가정으로 인해 이전에는 수익성이 있던 후보가 손실을 낸다.
+- 선택한 날짜 범위가 너무 짧아 워크포워드 창을 만들 수 없다.
+- 한 폴드에 거래나 유효한 신호가 없거나 가격 데이터가 누락된다.
 
-## Success Criteria *(mandatory)*
+## 요구사항 *(필수)*
 
-### Measurable Outcomes
+### 기능 요구사항
 
-- **SC-001**: 100% of robust optimization result views include more than total return when enough data is available.
-- **SC-002**: 100% of robust optimization result views include transaction-cost-adjusted performance.
-- **SC-003**: 100% of valid walk-forward runs report every fold's train period, test period, and out-of-sample metrics.
-- **SC-004**: At least 95% of deterministic test cases correctly reject candidates with fewer than 30 completed trades or maximum drawdown above 25%.
-- **SC-005**: At least 95% of deterministic test cases correctly penalize candidates with strong average performance but weak worst-fold or unstable fold results.
-- **SC-006**: Users can compare robust optimized parameters, manual parameters, and passive baseline performance in one result view.
-- **SC-007**: 100% of report outputs containing optimization metrics include no-recommendation framing and the required disclaimer.
-- **SC-008**: All new optimization, walk-forward, regime, and safety tests run without live external API calls.
+- **FR-001**: 시스템은 전략 매개변수 선택에서 총수익률을 유일한 최적화 목표로 사용하는 것을 반드시 금지해야 한다.
+- **FR-002**: 시스템은 수익률, 낙폭, 위험 조정 수익률, 승률, 수익 계수, 거래 횟수, 평균 보유 기간, 거래 비용 조정 수익률과 회전율 또는 거래 빈도 지표로 후보 매개변수를 반드시 평가해야 한다.
+- **FR-003**: 시스템은 후보를 견고하다고 표시하기 전에 최소 30회의 완료된 거래와 25% 이하의 최대 낙폭을 반드시 요구해야 한다.
+- **FR-004**: 시스템은 최적화된 수익률 지표를 제시하기 전에 거래 비용을 반드시 적용해야 하며, 사용자가 가정을 변경할 수 있도록 하면서 편도 수수료 0.05%와 편도 슬리피지 0.05%를 기본값으로 사용해야 한다.
+- **FR-005**: 시스템은 위험 균형형 정책을 기본값으로 사용하는 가중 견고성 점수를 반드시 지원해야 한다. 기본 정책은 표본 외 수익률 30%, 위험 조정 수익률 25%, 낙폭 통제 20%, 최악 폴드 회복력 15%, 안정성 또는 회전율 페널티 10%다.
+- **FR-006**: 시스템은 사용자가 후보 선택 이유를 이해할 수 있도록 후보 순위에 사용한 점수 구성 요소를 반드시 보고해야 한다.
+- **FR-007**: 시스템은 검증을 위해 과거 데이터를 시간 순서로 반드시 분할하여 각 검증 구간이 해당 선택 구간 이후에 오도록 보장해야 한다.
+- **FR-008**: 시스템은 학습 구간, 테스트 구간, 선택된 후보 요약, 표본 외 지표와 경고를 포함한 폴드별 워크포워드 결과를 반드시 제공해야 한다.
+- **FR-009**: 시스템은 표본 외 수익률 중앙값, 최악 폴드 수익률, 낙폭과 폴드 간 변동성을 포함하는 안정성 중심 요약으로 폴드 결과를 반드시 집계해야 한다.
+- **FR-010**: 요청된 워크포워드 평가에서 최소 3개의 유효 테스트 폴드를 생성할 수 없을 때 시스템은 데이터 부족을 반드시 식별하고 공개해야 한다.
+- **FR-011**: 충분한 데이터가 있을 때 시스템은 평가 구간을 반드시 시장 국면으로 분류해야 하며, 상승장, 하락장, 횡보장, 고변동성과 저변동성 조건을 포함해야 한다.
+- **FR-012**: 시스템은 시장 국면별 전략 동작을 반드시 따로 보고하고, 해당 국면의 완료된 거래가 10회 미만이거나 거래일이 60일 미만이면 국면 결과를 낮은 신뢰도로 표시해야 한다.
+- **FR-013**: 시스템은 시장 국면별로 별도의 매개변수 집합을 도입하기 전에 모든 시장 국면에 적용되는 하나의 견고한 매개변수 후보를 먼저 반드시 선택해야 한다.
+- **FR-014**: 시스템은 각 시장 국면별 후보에 충분한 표본 외 근거와 위험 공개가 있을 때만 향후 시장 국면별 매개변수 평가를 허용해야 한다.
+- **FR-015**: 시스템은 동일한 평가 구간에서 견고하게 최적화된 후보를 현재 수동 매개변수 구성 및 단순 패시브 기준선과 반드시 비교해야 한다.
+- **FR-016**: 시스템은 보고서가 수치 주장을 추적 가능한 근거와 함께 인용할 수 있도록 충분한 최적화 요약 데이터를 반드시 저장하거나 노출해야 한다.
+- **FR-017**: 시스템은 모든 최적화 테스트를 결정적으로 유지하고 실시간 외부 공급자와 독립적으로 실행해야 한다.
 
-## Assumptions
+### 안전성, 근거 및 신뢰성 요구사항 *(리서치 워크플로 변경 시 필수)*
 
-- The first implementation should prioritize one robust all-regime parameter candidate before adding regime-specific parameter application.
-- Weighted robust scoring is the MVP default because it is easier to explain than a full multi-objective Pareto workflow.
-- Multi-objective candidate exploration may be considered later if the result presentation remains understandable and safety-compliant.
-- Regime labels are used for research explanation and validation, not for automated order execution.
-- Persistent storage beyond local project storage is out of scope for the current portfolio MVP unless a later plan explicitly expands project infrastructure.
-- Optimization output is evidence for scenario comparison only and must not become financial advice or a trading system.
+- **SER-001**: 시스템은 직접적인 매수·매도·보유 권유, 거래 지시, 수익 보장 주장, 목표가 보장 주장과 주문 실행 동작을 반드시 피해야 한다.
+- **SER-002**: 기능이 리서치 출력에 영향을 주는 경우 시스템은 중요한 수치 또는 사실에 관한 보고서 주장을 `EvidenceItem` 레코드로 반드시 뒷받침해야 한다.
+- **SER-003**: 최종 한국어 보고서는 constitution에 정확히 정의된 교육 목적의 비권유 면책문을 반드시 포함해야 한다.
+- **SER-004**: 시스템은 누락되거나 성능이 저하된 시장·기업·뉴스 데이터를 조작하여 만들어내지 않고 반드시 공개해야 한다.
+- **SER-005**: 워크플로에 영향을 주는 기능은 검증 실패, 공급자 실패, 평가 실패와 재작성 제한에 대해 결정적인 동작을 반드시 정의해야 한다.
+- **SER-006**: 런타임에 영향을 주는 기능은 constitution이 요구하는 구조화 로그, 보고서 저장, 상태 확인과 지표를 반드시 보존해야 한다.
+- **SER-007**: 최적화 출력은 백테스트와 표본 외 과거 평가가 과적합 위험을 줄이지만 제거하지는 못한다는 사실을 반드시 명시해야 한다.
+- **SER-008**: 최적화 출력은 선택된 매개변수를 권고, 거래 신호 또는 미래 수익률 예상으로 설명해서는 안 된다.
+- **SER-009**: Evaluator 검사는 견고한 매개변수를 보장되거나 조언과 유사하거나 자동 실행에 적합한 것으로 제시하는 모든 보고서를 반드시 실패 처리해야 한다.
+
+### 핵심 개체 *(기능에 데이터가 포함되는 경우)*
+
+- **최적화 실행(Optimization Run)**: ticker, 날짜 범위, 비용 가정, 점수 정책, 폴드 구성과 요약 상태를 포함하는 사용자가 요청한 단일 평가.
+- **매개변수 후보(Parameter Candidate)**: 수익률, 위험, 거래 동작, 비용 조정 성과, 폴드 안정성과 경고로 평가한 매개변수 집합.
+- **워크포워드 폴드(Walk-Forward Fold)**: 시간 순서에 따른 선택 구간과 그 이후의 검증 구간 및 표본 외 지표.
+- **견고성 점수(Robust Score)**: 표본 외 성과, 하방 위험 통제, 폴드 안정성, 최악 구간 회복력과 회전율 페널티를 결합한 투명한 점수.
+- **시장 국면 구간(Market Regime Segment)**: 상승장, 하락장, 횡보장, 고변동성 또는 저변동성 기간별로 후보 동작을 요약하는 데 사용하는 시장 조건 라벨.
+- **최적화 근거 항목(Optimization Evidence Item)**: 보고서 또는 에이전트 출력에서 사용하는 최적화 수치 주장을 위한 추적 가능한 근거 레코드.
+
+## 성공 기준 *(필수)*
+
+### 측정 가능한 결과
+
+- **SC-001**: 충분한 데이터가 있을 때 견고한 최적화 결과 보기의 100%가 총수익률 외의 지표를 포함한다.
+- **SC-002**: 견고한 최적화 결과 보기의 100%가 거래 비용 조정 성과를 포함한다.
+- **SC-003**: 유효한 워크포워드 실행의 100%가 모든 폴드의 학습 구간, 테스트 구간과 표본 외 지표를 보고한다.
+- **SC-004**: 결정적 테스트 사례의 최소 95%가 완료된 거래 30회 미만 또는 최대 낙폭 25% 초과인 후보를 올바르게 거부한다.
+- **SC-005**: 결정적 테스트 사례의 최소 95%가 평균 성과는 강하지만 최악 폴드가 취약하거나 폴드 결과가 불안정한 후보에 올바르게 페널티를 적용한다.
+- **SC-006**: 사용자는 하나의 결과 보기에서 견고하게 최적화된 매개변수, 수동 매개변수와 패시브 기준선 성과를 비교할 수 있다.
+- **SC-007**: 최적화 지표가 포함된 보고서 출력의 100%가 비권유 표현과 필수 면책문을 포함한다.
+- **SC-008**: 모든 신규 최적화, 워크포워드, 시장 국면과 안전 테스트는 실시간 외부 API 호출 없이 실행된다.
+
+## 가정
+
+- 첫 구현은 시장 국면별 매개변수 적용을 추가하기 전에 모든 시장 국면에 적용되는 하나의 견고한 매개변수 후보를 우선해야 한다.
+- 가중 견고성 점수는 완전한 다목적 Pareto 워크플로보다 설명하기 쉬우므로 MVP 기본값으로 사용한다.
+- 결과 표현이 이해하기 쉽고 안전 요구사항을 준수한다면 다목적 후보 탐색을 나중에 고려할 수 있다.
+- 시장 국면 라벨은 자동 주문 실행이 아니라 리서치 설명과 검증에 사용한다.
+- 이후 계획에서 프로젝트 인프라를 명시적으로 확장하지 않는 한 로컬 프로젝트 저장소를 넘는 영구 저장소는 현재 포트폴리오 MVP 범위에서 제외한다.
+- 최적화 출력은 시나리오 비교를 위한 근거일 뿐이며 금융 자문이나 거래 시스템이 되어서는 안 된다.

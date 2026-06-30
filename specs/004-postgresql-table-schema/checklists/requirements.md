@@ -1,36 +1,38 @@
-# Specification Quality Checklist: PostgreSQL Source-of-Truth Table Schema
+# 명세 품질 체크리스트: PostgreSQL 기준 정보원 테이블 스키마
 
-**Purpose**: Validate specification completeness and quality before proceeding to planning
-**Created**: 2026-06-18
-**Feature**: [spec.md](../spec.md)
+**목적**: 계획 단계로 진행하기 전에 명세의 완전성과 품질을 검증한다.
 
-## Content Quality
+**작성일**: 2026-06-18
 
-- [x] No implementation details (languages, frameworks, APIs)
-- [x] Focused on user value and business needs
-- [x] Written for non-technical stakeholders
-- [x] All mandatory sections completed
+**기능**: [spec.md](../spec.md)
 
-## Requirement Completeness
+## 내용 품질
 
-- [x] No [NEEDS CLARIFICATION] markers remain
-- [x] Requirements are testable and unambiguous
-- [x] Success criteria are measurable
-- [x] Success criteria are technology-agnostic (no implementation details)
-- [x] All acceptance scenarios are defined
-- [x] Edge cases are identified
-- [x] Scope is clearly bounded
-- [x] Dependencies and assumptions identified
+- [x] 언어, 프레임워크, API 같은 구현 세부사항이 없다.
+- [x] 사용자 가치와 비즈니스 요구에 초점을 맞춘다.
+- [x] 비기술 이해관계자가 이해할 수 있게 작성되었다.
+- [x] 모든 필수 섹션이 작성되었다.
 
-## Feature Readiness
+## 요구사항 완전성
 
-- [x] All functional requirements have clear acceptance criteria
-- [x] User scenarios cover primary flows
-- [x] Feature meets measurable outcomes defined in Success Criteria
-- [x] No implementation details leak into specification
+- [x] [NEEDS CLARIFICATION] 표시가 남아 있지 않다.
+- [x] 요구사항이 테스트 가능하고 모호하지 않다.
+- [x] 성공 기준이 측정 가능하다.
+- [x] 성공 기준이 특정 구현 기술에 종속되지 않는다.
+- [x] 모든 인수 시나리오가 정의되었다.
+- [x] 경계 사례가 식별되었다.
+- [x] 범위가 명확하게 한정되었다.
+- [x] 의존성과 가정이 식별되었다.
 
-## Notes
+## 기능 준비도
 
-- Validation pass 1 completed on 2026-06-18.
-- The feature intentionally names PostgreSQL and table-level entities because the user requested a PostgreSQL table specification. The spec avoids code, library, DDL syntax, migration tooling, and deployment implementation details.
-- No clarification markers remain; the spec is ready for `/speckit-plan`.
+- [x] 모든 기능 요구사항에 명확한 인수 조건이 있다.
+- [x] 사용자 시나리오가 주요 흐름을 포함한다.
+- [x] 기능이 성공 기준에 정의된 측정 가능한 결과를 충족하도록 구성되었다.
+- [x] 불필요한 구현 세부사항이 명세에 유입되지 않았다.
+
+## 메모
+
+- 검증 1차 검토를 2026-06-18에 완료했다.
+- 사용자가 PostgreSQL 테이블 명세를 요청했으므로 이 기능은 PostgreSQL과 테이블 수준 개체를 의도적으로 명시한다. 명세에는 코드, 라이브러리, DDL 문법, 마이그레이션 도구와 배포 구현 세부사항이 없다.
+- 명확화 표시가 남아 있지 않으며 명세는 `/speckit-plan` 단계로 진행할 준비가 되었다.
